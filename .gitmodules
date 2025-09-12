@@ -1,0 +1,3 @@
+[submodule "prophecy"]
+	path = prophecy
+	url = git@github.com:rvosa/prophecy.git
