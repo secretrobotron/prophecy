@@ -1,6 +1,6 @@
-# Prophecy: Biblical Text Analysis and Story Extraction
+# Prophecy: Hebrew Bible Text Analysis and Story Extraction
 
-A Python toolkit for analyzing biblical texts, extracting stories, and working with structured biblical data. This project provides programmatic access to the King James Version Bible organized by stories rather than just chapters and verses.
+A Python toolkit for analyzing biblical texts, extracting stories, and working with structured biblical data. This project provides programmatic access to the Bible organized by stories rather than just chapters and verses.
 
 ## Overview
 
@@ -9,9 +9,9 @@ The Prophecy project bridges the gap between traditional biblical organization (
 ## Key Features
 
 - **Story-based Biblical Text Access**: Extract complete biblical narratives spanning multiple chapters
-- **Comprehensive Story Index**: 72+ major Old Testament stories with precise verse ranges
+- **Comprehensive Story Index**: 72+ major Hebrew Bible stories with precise verse ranges
 - **Structured Data Format**: JSON-based Bible text with chapter/verse organization
-- **Testament Indexes**: Separate Old and New Testament book catalogs
+- **Testament Indexes**: Index of Hebrew Bible books from the KJV translation
 - **Flexible Text Extraction**: Retrieve stories by name, book, or custom verse ranges
 - **Clean API Design**: Object-oriented Python modules for easy integration
 
@@ -20,11 +20,10 @@ The Prophecy project bridges the gap between traditional biblical organization (
 ```
 prophecy/
 ├── data/
-│   ├── bible-kjv/          # KJV Bible JSON files (submodule)
-│   ├── stories.yml         # Story definitions with verse ranges
-│   ├── old_testament.json  # OT book index
-│   └── new_testament.json  # NT book index
-├── prophecy/               # Python package (planned)
+│   ├── bible-kjv/         # KJV Bible JSON files (submodule)
+│   ├── stories.yml        # Story definitions with verse ranges
+│   └── index.json         # HB book index
+├── prophecy/              # Python package (planned)
 │   ├── bible.py           # Bible text access classes
 │   ├── stories.py         # Story extraction and analysis
 │   └── utils.py           # Utility functions
