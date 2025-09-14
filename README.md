@@ -113,7 +113,6 @@ Stories use standard biblical citation format:
 ## Contributing
 
 Contributions welcome! Areas of need:
-- New Testament story definitions
 - Additional Old Testament narratives
 - Python API development
 - Documentation and examples
