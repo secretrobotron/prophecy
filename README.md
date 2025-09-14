@@ -37,6 +37,7 @@ prophecy/
 - **Bible Text**: King James Version from [aruljohn/Bible-kjv](https://github.com/aruljohn/Bible-kjv)
 - **Story Definitions**: Curated collection of major biblical narratives
 - **Verse Ranges**: Precisely mapped story boundaries using standard biblical citations
+- **Analysis Prompts**: Curated collection of sentiment [prompts](https://docs.google.com/spreadsheets/d/14xjsF39o8T6dVA0DCRL9hz_tPHRQv4rVb8MAeP52GLQ/)
 
 ## Use Cases
 
