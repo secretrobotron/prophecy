@@ -4,7 +4,7 @@ Test module to verify the structure of data/stories.yml against requirements.
 
 Requirements being tested:
 1. Every top-level entry is the title of a bible story
-2. Each story has a 'book' field that must occur in data/old_testament.json
+2. Each story has a 'book' field that must occur in data/index.json
 3. Each story has a 'verses' field containing a list
 4. Each verses list element follows format: 'chapter:verse-chapter:verse' 
 5. All chapters and verses must exist in the specified book's JSON file
@@ -36,19 +36,19 @@ class TestStoriesStructure:
             return yaml.safe_load(f)
     
     @pytest.fixture(scope="class")
-    def old_testament_index(self, data_path):
-        """Load the old_testament.json index file."""
-        ot_file = data_path / "old_testament.json"
-        assert ot_file.exists(), f"old_testament.json not found at {ot_file}"
+    def index(self, data_path):
+        """Load the index.json index file."""
+        ot_file = data_path / "index.json"
+        assert ot_file.exists(), f"index.json not found at {ot_file}"
         
         with open(ot_file, 'r', encoding='utf-8') as f:
             return json.load(f)
     
     @pytest.fixture(scope="class")
-    def bible_books_cache(self, data_path, old_testament_index):
+    def bible_books_cache(self, data_path, index):
         """Cache bible book data to avoid repeated file reads."""
         cache = {}
-        for book_name, book_path in old_testament_index.items():
+        for book_name, book_path in index.items():
             full_path = data_path.parent / book_path
             if full_path.exists():
                 with open(full_path, 'r', encoding='utf-8') as f:
@@ -84,13 +84,13 @@ class TestStoriesStructure:
             assert isinstance(story_data['verses'], list), f"Story '{story_title}' verses field is not a list"
             assert len(story_data['verses']) > 0, f"Story '{story_title}' has empty verses list"
     
-    def test_book_references_exist_in_old_testament(self, stories_data, old_testament_index):
-        """Test that all book references exist in data/old_testament.json."""
+    def test_book_references_exist_in_index(self, stories_data, index):
+        """Test that all book references exist in data/index.json."""
         for story_title, story_data in stories_data.items():
             book_name = story_data['book']
-            assert book_name in old_testament_index, \
-                f"Story '{story_title}' references book '{book_name}' not found in old_testament.json. " \
-                f"Available books: {list(old_testament_index.keys())}"
+            assert book_name in index, \
+                f"Story '{story_title}' references book '{book_name}' not found in index.json. " \
+                f"Available books: {list(index.keys())}"
     
     def test_verses_format_is_valid(self, stories_data):
         """Test that verses follow the format 'chapter:verse-chapter:verse'."""
@@ -177,7 +177,7 @@ class TestStoriesStructure:
             assert len(unexpected) == 0, \
                 f"Story '{story_title}' has unexpected fields: {unexpected}"
     
-    def test_comprehensive_stories_coverage(self, stories_data, old_testament_index):
+    def test_comprehensive_stories_coverage(self, stories_data, index):
         """Test that stories reference a reasonable variety of OT books."""
         referenced_books = set()
         for story_data in stories_data.values():
@@ -190,7 +190,7 @@ class TestStoriesStructure:
         
         # All referenced books should be from the Old Testament
         for book in referenced_books:
-            assert book in old_testament_index, \
+            assert book in index, \
                 f"Referenced book '{book}' not in Old Testament index"
 
 
