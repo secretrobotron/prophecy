@@ -6,6 +6,3 @@ dependencies:
   - requests
   - pyyaml
   - pandas
-  - pip
-  - pip:
-    - []
