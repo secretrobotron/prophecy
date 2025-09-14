@@ -1,0 +1,3 @@
+[submodule "bible-kjv"]
+	path = bible-kjv
+	url = https://github.com/aruljohn/Bible-kjv.git
