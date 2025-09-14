@@ -16,57 +16,57 @@ The Great Flood:
   verses:
     - 6:5-9:17
 The Tower of Babel:
-  book: Genesis 
-  verses: 
+  book: Genesis
+  verses:
     - 11:1-11:9
 God Calls Abraham:
-  book: Genesis 
+  book: Genesis
   verses:
     - 12:1-12:9
 Sodom and Gomorrah:
-  book: Genesis 
+  book: Genesis
   verses:
     - 18:16-19:29
 Abraham's Obedience:
-  book: Genesis 
+  book: Genesis
   verses:
     - 22:1-22:19
 Isaac Marries Rebekah:
-  book: Genesis 
+  book: Genesis
   verses:
     - 24:1-24:67
 Esau's Birthright:
-  book: Genesis 
+  book: Genesis
   verses:
     - 25:19-25:34
 Isaac Blesses Jacob:
-  book: Genesis 
-  verses: 
+  book: Genesis
+  verses:
     - 27:1-27:40
 Jacob and Laban:
-  book: Genesis 
+  book: Genesis
   verses:
     - 29:1-31:55
 Jacob Wrestles:
-  book: Genesis 
+  book: Genesis
   verses:
     - 32:1-33:20
 Revenge against Shechem:
-  book: Genesis 
+  book: Genesis
   verses:
     - 34:1-34:31
     - 49:5-49:7
 Joseph in Prison:
-  book: Genesis 
+  book: Genesis
   verses:
     - 39:1-40:23
 Joseph as a Ruler:
-  book: Genesis 
+  book: Genesis
   verses:
     - 41:1-41:57
 Family Reunion:
-  book: Genesis 
-  verses: 
+  book: Genesis
+  verses:
     - 42:1-45:28
     - 46:28-46:30
 Moses' Birth:
@@ -74,220 +74,220 @@ Moses' Birth:
   verses:
     - 1:1-2:10
 The Burning Bush:
-  book: Exodus 
+  book: Exodus
   verses:
     - 3:1-3:22
 The Ten Plagues:
-  book: Exodus 
+  book: Exodus
   verses:
     - 7:14-12:30
 The Exodus:
-  book: Exodus 
+  book: Exodus
   verses:
     - 12:31-12:51
 The Red Sea:
-  book: Exodus 
+  book: Exodus
   verses:
     - 14:5-14:31
 The Gold Calf:
-  book: Exodus 
+  book: Exodus
   verses:
     - 32:1-32:29
 Exploring the Land:
-  book: Numbers 
+  book: Numbers
   verses:
     - 13:1-14:38
 Rebellion in the Ranks:
-  book: Numbers 
+  book: Numbers
   verses:
     - 16:1-17:13
 Balak and Balaam:
-  book: Numbers 
+  book: Numbers
   verses:
     - 22:1-24:25
 Rahab and the Spies:
-  book: Joshua 
+  book: Joshua
   verses:
     - 2:1-2:24
 Jericho Falls:
-  book: Joshua 
+  book: Joshua
   verses:
     - 6:1-6:27
 Gibeon's Con Artists:
-  book: Joshua 
+  book: Joshua
   verses:
     - 9:1-9:27
 Deborah and Barak:
-  book: Judges 
+  book: Judges
   verses:
     - 4:1-4:24
 Gideon as Judge:
-  book: Judges 
+  book: Judges
   verses:
     - 6:1-7:25
 Abimelech's Ambition:
-  book: Judges 
+  book: Judges
   verses:
     - 9:1-9:57
 Samson as Judge:
-  book: Judges 
+  book: Judges
   verses:
     - 13:1-16:31
 Ruth, Naomi and Boaz:
-  book: Ruth 
+  book: Ruth
   verses:
     - 1:1-4:22
 Samuel is Born:
-  book: 1 Samuel 
+  book: 1 Samuel
   verses:
     - 1:1-1:28
 Samuel the Prophet:
-  book: 1 Samuel 
+  book: 1 Samuel
   verses:
     - 3:1-4:22
 Saul Becomes King:
-  book: 1 Samuel 
+  book: 1 Samuel
   verses:
     - 9:1-10:27
 Jonathan's Bravery:
-  book: 1 Samuel 
+  book: 1 Samuel
   verses:
     - 14:1-14:46
 Saul's Disobedience:
-  book: 1 Samuel 
+  book: 1 Samuel
   verses:
     - 15:1-15:35
 David Kills Goliath:
-  book: 1 Samuel 
+  book: 1 Samuel
   verses:
     - 17:1-17:51
 David and Jonathan:
-  book: 1 Samuel 
+  book: 1 Samuel
   verses:
     - 18:1-18:4
     - 20:1-20:42
 Nabal and Abigail:
-  book: 1 Samuel 
+  book: 1 Samuel
   verses:
     - 25:1-25:44
 Saul's Death:
-  book: 1 Samuel 
+  book: 1 Samuel
   verses:
     - 28:1-28:25
     - 30:1-30:13
 David's Success:
-  book: 2 Samuel 
+  book: 2 Samuel
   verses:
     - 5:1-6:23
 David and Bathsheba:
-  book: 2 Samuel 
+  book: 2 Samuel
   verses:
     - 11:1-12:25
 Amnon and Tamar:
-  book: 2 Samuel 
+  book: 2 Samuel
   verses:
     - 13:1-13:22
 Absalom:
-  book: 2 Samuel 
+  book: 2 Samuel
   verses:
     - 13:23-19:8
 Solomon's Wisdom:
-  book: 1 Kings 
+  book: 1 Kings
   verses:
     - 3:1-3:28
 Jeroboam and Rehoboam:
-  book: 1 Kings 
+  book: 1 Kings
   verses:
     - 11:26-14:31
 Elijah's Challenge:
-  book: 1 Kings 
+  book: 1 Kings
   verses:
     - 17:1-18:46
 God Speaks to Elijah:
-  book: 1 Kings 
+  book: 1 Kings
   verses:
     - 19:1-19:21
 Micaiah the Prophet:
-  book: 1 Kings 
+  book: 1 Kings
   verses:
     - 22:1-22:40
 Chariot of Fire:
-  book: 2 Kings 
+  book: 2 Kings
   verses:
     - 1:1-2:25
 Elisha Heals Naaman:
-  book: 2 Kings 
+  book: 2 Kings
   verses:
     - 5:1-5:27
 Famine and Unbelief:
-  book: 2 Kings 
+  book: 2 Kings
   verses:
     - 6:24-7:20
 Joash and Jehoiada:
-  book: 2 Kings 
+  book: 2 Kings
   verses:
     - 11:1-11:21
 Hezekiah Trusts God:
-  book: 2 Kings 
+  book: 2 Kings
   verses:
     - 18:13-19:37
 Josiah's Reign:
-  book: 2 Kings 
+  book: 2 Kings
   verses:
     - 22:1-23:30
 Fall of Jerusalem:
-  book: 2 Kings 
+  book: 2 Kings
   verses:
     - 24:18-25:30
 David's Power:
-  book: 1 Chronicles 
+  book: 1 Chronicles
   verses:
     - 11:1-11:25
 David's Census:
-  book: 1 Chronicles 
+  book: 1 Chronicles
   verses:
     - 21:1-22:1
 Jehoshaphat and Ahab:
-  book: 2 Chronicles 
+  book: 2 Chronicles
   verses:
     - 18:1-19:11
 Ezra Rebuilds the Altar:
-  book: Ezra 
+  book: Ezra
   verses:
     - 3:1-3:13
 Nehemiah Builds the Wall:
-  book: Nehemiah 
-  verses: 
+  book: Nehemiah
+  verses:
     - 2:1-2:20
 Enemy Opposition:
-  book: Nehemiah 
+  book: Nehemiah
   verses:
     - 4:1-4:23
 Nehemiah's Justice:
-  book: Nehemiah 
+  book: Nehemiah
   verses:
     - 5:1-5:19
 Esther Saves the Jews:
-  book: Esther 
+  book: Esther
   verses:
     - 1:1-10:3
 Job is Tested:
-  book: Job 
+  book: Job
   verses:
     - 1:1-1:22
 Ezekiel's Vision:
-  book: Ezekiel 
+  book: Ezekiel
   verses:
     - 37:1-37:14
 The Fiery Furnace:
-  book: Daniel 
+  book: Daniel
   verses:
     - 3:1-3:30
 The Lions' Den:
-  book: Daniel 
+  book: Daniel
   verses:
     - 6:1-6:28
 Jonah:
-  book: Jonah 
+  book: Jonah
   verses:
     - 1:1-4:11
