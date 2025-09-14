@@ -106,10 +106,9 @@ Stories use standard biblical citation format:
 
 - ✅ **Data Layer**: Complete Bible text, story definitions, indexes
 - ✅ **Story Mapping**: 72+ stories with precise verse ranges
+- 🔄 **Testing**: Comprehensive test suite planned
 - 🔄 **Python Package**: Object-oriented API in development
 - 📋 **Documentation**: API docs and tutorials planned
-- 📋 **Testing**: Comprehensive test suite planned
-- 📋 **New Testament**: Story mapping for NT narratives planned
 
 ## Contributing
 
