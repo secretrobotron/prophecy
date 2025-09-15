@@ -65,11 +65,11 @@ print(f"Verses: {creation_story['verses']}")
 
 # Load testament indexes
 import json
-with open('data/old_testament.json') as f:
-    old_testament = json.load(f)
+with open('data/index.json') as f:
+    books = json.load(f)
 
 # Get path to Genesis
-genesis_path = old_testament['Genesis']
+genesis_path = books['Genesis']
 # Returns: "data/bible-kjv/Genesis.json"
 ```
 
