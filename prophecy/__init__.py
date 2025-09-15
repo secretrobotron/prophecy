@@ -6,6 +6,7 @@ rather than just chapters and verses.
 """
 
 from .bible import Bible
+from .stories import Stories, Story
 
 __version__ = "0.1.0"
-__all__ = ["Bible"]
+__all__ = ["Bible", "Stories", "Story"]
