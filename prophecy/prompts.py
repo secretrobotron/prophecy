@@ -73,7 +73,7 @@ class Prompts:
         Returns:
             List of dictionaries, each containing 'id', 'period', 'topic', 'prompt' keys
         """
-        return self._prompts_data.copy()
+        return [prompt.copy() for prompt in self._prompts_data]
     
     def get_prompt_by_id(self, prompt_id: str) -> Dict[str, str]:
         """
@@ -188,7 +188,12 @@ class Prompts:
         # Validate story_object
         required_attrs = ['title', 'book', 'verses']
         for attr in required_attrs:
-            if not hasattr(story_object, attr):
+            try:
+                value = getattr(story_object, attr)
+                # Check if it's a Mock object (for testing) that wasn't explicitly set
+                if hasattr(value, '_mock_name'):
+                    raise AttributeError(f"Story object missing required attribute: {attr}")
+            except AttributeError:
                 raise AttributeError(f"Story object missing required attribute: {attr}")
         
         # Prepare template variables

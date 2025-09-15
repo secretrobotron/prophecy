@@ -275,7 +275,8 @@ Another very long line that needs to be wrapped at the appropriate width to ensu
         assert isinstance(result, str)
         assert 'Babylonian' in result
         assert 'Geopolitical Danger' in result
-        assert 'There is an upcoming significant destruction' in result
+        # Check for the prompt text, accounting for potential line folding
+        assert 'There is an upcoming significant destruction' in result.replace('\n', ' ')
         assert text in result
         
         # Check that lines are properly folded
