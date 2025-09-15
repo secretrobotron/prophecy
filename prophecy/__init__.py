@@ -7,6 +7,15 @@ rather than just chapters and verses.
 
 from .bible import Bible
 from .stories import Stories, Story
+from .ai_providers import AIProvider, ChatGPTProvider, AIProviderFactory, AIProviderError
 
 __version__ = "0.1.0"
-__all__ = ["Bible", "Stories", "Story"]
+__all__ = [
+    "Bible", 
+    "Stories", 
+    "Story", 
+    "AIProvider", 
+    "ChatGPTProvider", 
+    "AIProviderFactory", 
+    "AIProviderError"
+]
