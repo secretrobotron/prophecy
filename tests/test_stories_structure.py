@@ -178,7 +178,7 @@ class TestStoriesStructure:
                 f"Story '{story_title}' has unexpected fields: {unexpected}"
     
     def test_comprehensive_stories_coverage(self, stories_data, index):
-        """Test that stories reference a reasonable variety of OT books."""
+        """Test that stories reference a reasonable variety of Hebrew Bible books."""
         referenced_books = set()
         for story_data in stories_data.values():
             referenced_books.add(story_data['book'])
@@ -188,10 +188,10 @@ class TestStoriesStructure:
             f"Stories only reference {len(referenced_books)} different books. Expected at least 10. " \
             f"Referenced books: {sorted(referenced_books)}"
         
-        # All referenced books should be from the Old Testament
+        # All referenced books should be from the Hebrew Bible
         for book in referenced_books:
             assert book in index, \
-                f"Referenced book '{book}' not in Old Testament index"
+                f"Referenced book '{book}' not in Hebrew Bible index"
 
 
 if __name__ == "__main__":

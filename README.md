@@ -145,7 +145,7 @@ analysis = ai.analyze_text(creation_text, "Analyze the tone and themes")
 
 ## Story Coverage
 
-Currently includes 72+ major Old Testament narratives:
+Currently includes 72+ major Hebrew Bible narratives:
 
 - **Genesis**: Creation, Fall, Noah, Abraham, Isaac, Jacob, Joseph
 - **Exodus**: Moses, Burning Bush, Ten Plagues, Red Sea, Ten Commandments

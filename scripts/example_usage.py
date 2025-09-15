@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Example script showing how to use the Old and New Testament index files.
+Example script showing how to use the Hebrew Bible and New Testament index files.
 """
 
 import json
 
 def load_testament_index(testament_type):
-    """Load either 'old' or 'new' testament index."""
-    filename = f"{testament_type}_testament.json"
+    """Load either 'old' (Hebrew Bible) or 'new' testament index."""
+    filename = f"data/{testament_type}_testament.json"
     with open(filename, 'r') as f:
         return json.load(f)
 
@@ -24,13 +24,13 @@ def main():
     """Demonstrate usage of the Bible index files."""
     
     # Load both testaments
-    old_testament = load_testament_index('old')
+    hebrew_bible = load_testament_index('old')
     new_testament = load_testament_index('new')
     
-    print("=== Old Testament Books ===")
-    for book_name in old_testament:
+    print("=== Hebrew Bible Books ===")
+    for book_name in hebrew_bible:
         print(f"  - {book_name}")
-    print(f"Total: {len(old_testament)} books")
+    print(f"Total: {len(hebrew_bible)} books")
     
     print("\n=== New Testament Books ===")
     for book_name in new_testament:
@@ -39,7 +39,7 @@ def main():
     
     # Example: Load Genesis data
     print("\n=== Example: Genesis Chapter 1, Verse 1 ===")
-    genesis_data = get_book_data('Genesis', old_testament)
+    genesis_data = get_book_data('Genesis', hebrew_bible)
     if genesis_data:
         first_verse = genesis_data['chapters'][0]['verses'][0]
         print(f"Book: {genesis_data['book']}")
@@ -55,9 +55,9 @@ def main():
     
     # Example: Search for a specific book
     print("\n=== Example: Find 'Psalms' ===")
-    if 'Psalms' in old_testament:
-        print(f"Psalms found in Old Testament: {old_testament['Psalms']}")
-        psalms_data = get_book_data('Psalms', old_testament)
+    if 'Psalms' in hebrew_bible:
+        print(f"Psalms found in Hebrew Bible: {hebrew_bible['Psalms']}")
+        psalms_data = get_book_data('Psalms', hebrew_bible)
         print(f"Psalms has {len(psalms_data['chapters'])} chapters")
 
 if __name__ == "__main__":
