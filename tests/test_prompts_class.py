@@ -438,8 +438,10 @@ class TestPromptsIntegration:
             # Should contain the key elements
             assert prompt['period'] in result
             assert prompt['topic'] in result
-            assert prompt['prompt'] in result
-            assert text in result
+            # Check for the prompt text, accounting for potential line folding
+            assert prompt['prompt'] in result.replace('\n', ' ')
+            # Check for the text, accounting for potential line folding
+            assert ' '.join(text.split()) in ' '.join(result.split())
             
             # Should have proper line folding
             lines = result.split('\n')
