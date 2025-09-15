@@ -8,7 +8,7 @@ This directory contains utility scripts for setting up, maintaining, and working
 Creates index files for organizing biblical text data by testament.
 
 **Purpose:**
-- Generates `old_testament.json` and `new_testament.json` index files
+- Generates `old_testament.json` index file
 - Maps book names to their corresponding JSON file paths
 - Handles filename normalization (e.g., "Song of Solomon" → "SongofSolomon.json")
 - Validates book availability in the Bible data submodule
@@ -20,7 +20,6 @@ python scripts/create_bible_indexes.py
 
 **Generated files:**
 - `data/old_testament.json` - Index of Hebrew Bible books
-- `data/new_testament.json` - Index of New Testament books
 
 **Dependencies:**
 - Requires `data/bible-kjv/Books.json` (from the Bible submodule)
@@ -85,7 +84,7 @@ def normalize_book_name_to_filename(book_name):
     """Convert book name from Books.json to actual JSON filename format."""
     
 def create_bible_indexes():
-    """Create Hebrew Bible and New Testament index files."""
+    """Create Hebrew Bible index file."""
 ```
 
 **Process:**

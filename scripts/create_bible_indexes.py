@@ -24,7 +24,7 @@ def normalize_book_name_to_filename(book_name):
     return f"{filename}.json"
 
 def create_bible_indexes():
-    """Create Hebrew Bible and New Testament index files."""
+    """Create Hebrew Bible index file."""
     
     # Read the Books.json file
     with open('data/bible-kjv/Books.json', 'r') as f:
@@ -63,10 +63,10 @@ def create_bible_indexes():
         json.dump(hebrew_bible_index, f, indent=2)
     print(f"Created data/old_testament.json with {len(hebrew_bible_index)} books")
     
-    # Write New Testament index
-    with open('data/new_testament.json', 'w') as f:
-        json.dump(new_testament_index, f, indent=2)
-    print(f"Created data/new_testament.json with {len(new_testament_index)} books")
+    # Write New Testament index - REMOVED as requested
+    # with open('data/new_testament.json', 'w') as f:
+    #     json.dump(new_testament_index, f, indent=2)
+    # print(f"Created data/new_testament.json with {len(new_testament_index)} books")
     
     # Print summary
     print("\nHebrew Bible books:")

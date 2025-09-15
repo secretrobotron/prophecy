@@ -6,7 +6,10 @@ Example script showing how to use the Hebrew Bible and New Testament index files
 import json
 
 def load_testament_index(testament_type):
-    """Load either 'old' (Hebrew Bible) or 'new' testament index."""
+    """Load 'old' (Hebrew Bible) testament index. New Testament index is no longer available."""
+    if testament_type == 'new':
+        # New testament index file has been removed
+        return {}
     filename = f"data/{testament_type}_testament.json"
     with open(filename, 'r') as f:
         return json.load(f)
@@ -23,9 +26,9 @@ def get_book_data(book_name, testament_index):
 def main():
     """Demonstrate usage of the Bible index files."""
     
-    # Load both testaments
+    # Load Hebrew Bible (New Testament index is no longer available)
     hebrew_bible = load_testament_index('old')
-    new_testament = load_testament_index('new')
+    new_testament = load_testament_index('new')  # Returns empty dict
     
     print("=== Hebrew Bible Books ===")
     for book_name in hebrew_bible:
@@ -33,9 +36,12 @@ def main():
     print(f"Total: {len(hebrew_bible)} books")
     
     print("\n=== New Testament Books ===")
-    for book_name in new_testament:
-        print(f"  - {book_name}")
-    print(f"Total: {len(new_testament)} books")
+    if new_testament:
+        for book_name in new_testament:
+            print(f"  - {book_name}")
+        print(f"Total: {len(new_testament)} books")
+    else:
+        print("New Testament index file has been removed.")
     
     # Example: Load Genesis data
     print("\n=== Example: Genesis Chapter 1, Verse 1 ===")
@@ -45,13 +51,15 @@ def main():
         print(f"Book: {genesis_data['book']}")
         print(f"Chapter: {first_verse}")
     
-    # Example: Load Matthew data
+    # Example: Load Matthew data (will fail gracefully)
     print("\n=== Example: Matthew Chapter 1, Verse 1 ===")
     matthew_data = get_book_data('Matthew', new_testament)
     if matthew_data:
         first_verse = matthew_data['chapters'][0]['verses'][0]
         print(f"Book: {matthew_data['book']}")
         print(f"Chapter: {first_verse}")
+    else:
+        print("Matthew data not available (New Testament index removed).")
     
     # Example: Search for a specific book
     print("\n=== Example: Find 'Psalms' ===")
