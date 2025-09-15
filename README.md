@@ -11,7 +11,7 @@ The Prophecy project bridges the gap between traditional biblical organization (
 - **Story-based Biblical Text Access**: Extract complete biblical narratives spanning multiple chapters
 - **Comprehensive Story Index**: 72+ major Hebrew Bible stories with precise verse ranges
 - **Structured Data Format**: JSON-based Bible text with chapter/verse organization
-- **Testament Indexes**: Index of Hebrew Bible books from the KJV translation
+- **Book Indexes**: Index of Hebrew Bible books from the KJV translation
 - **Flexible Text Extraction**: Retrieve stories by name, book, or custom verse ranges
 - **Clean Python API**: Object-oriented modules for easy integration
 - **AI Integration**: Built-in support for OpenAI and other AI providers for text analysis
