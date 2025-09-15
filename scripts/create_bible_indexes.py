@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script to create Old Testament and New Testament index files for the Bible KJV submodule.
+Script to create Hebrew Bible and New Testament index files for the Bible KJV submodule.
 """
 
 import json
@@ -24,25 +24,25 @@ def normalize_book_name_to_filename(book_name):
     return f"{filename}.json"
 
 def create_bible_indexes():
-    """Create Old and New Testament index files."""
+    """Create Hebrew Bible and New Testament index files."""
     
     # Read the Books.json file
     with open('data/bible-kjv/Books.json', 'r') as f:
         books = json.load(f)
     
-    # Based on biblical canon, first 39 books are Old Testament, last 27 are New Testament
-    old_testament_books = books[:39]  # Genesis through Malachi
+    # Based on biblical canon, first 39 books are Hebrew Bible, last 27 are New Testament
+    hebrew_bible_books = books[:39]  # Genesis through Malachi
     new_testament_books = books[39:]  # Matthew through Revelation
     
-    # Create Old Testament index
-    old_testament_index = {}
-    for book_name in old_testament_books:
+    # Create Hebrew Bible index
+    hebrew_bible_index = {}
+    for book_name in hebrew_bible_books:
         filename = normalize_book_name_to_filename(book_name)
         file_path = f"data/bible-kjv/{filename}"
         
         # Verify the file exists
         if os.path.exists(file_path):
-            old_testament_index[book_name] = file_path
+            hebrew_bible_index[book_name] = file_path
         else:
             print(f"Warning: File not found for {book_name}: {file_path}")
     
@@ -58,10 +58,10 @@ def create_bible_indexes():
         else:
             print(f"Warning: File not found for {book_name}: {file_path}")
     
-    # Write Old Testament index
+    # Write Hebrew Bible index
     with open('data/old_testament.json', 'w') as f:
-        json.dump(old_testament_index, f, indent=2)
-    print(f"Created data/old_testament.json with {len(old_testament_index)} books")
+        json.dump(hebrew_bible_index, f, indent=2)
+    print(f"Created data/old_testament.json with {len(hebrew_bible_index)} books")
     
     # Write New Testament index
     with open('data/new_testament.json', 'w') as f:
@@ -69,8 +69,8 @@ def create_bible_indexes():
     print(f"Created data/new_testament.json with {len(new_testament_index)} books")
     
     # Print summary
-    print("\nOld Testament books:")
-    for book in old_testament_books:
+    print("\nHebrew Bible books:")
+    for book in hebrew_bible_books:
         print(f"  - {book}")
     
     print("\nNew Testament books:")

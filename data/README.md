@@ -14,7 +14,7 @@ This directory contains the core data files used by the Prophecy project for bib
 ### Index and Configuration
 - **`index.json`** - Maps biblical book names to their corresponding JSON file paths
   - Used by the Python API to locate Bible text files
-  - Contains 39 Old Testament books from the Hebrew Bible/Tanakh
+  - Contains 39 Hebrew Bible books from the Tanakh
   - Format: `{"BookName": "data/bible-kjv/BookName.json"}`
 
 ### Story Definitions
@@ -23,7 +23,7 @@ This directory contains the core data files used by the Prophecy project for bib
   - Includes book name and verse ranges for each story
   - Format: Standard biblical citation (e.g., `1:1-2:7` for Chapter 1, verse 1 through Chapter 2, verse 7)
   - Source: Curated from [biblestories.org](https://biblestories.org/)
-  - Coverage: Major Old Testament narratives from Genesis through minor prophets
+  - Coverage: Major Hebrew Bible narratives from Genesis through minor prophets
 
 ### Analysis Prompts
 - **`prompts.tsv`** - Tab-separated file containing sentiment analysis prompts

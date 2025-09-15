@@ -19,7 +19,7 @@ python scripts/create_bible_indexes.py
 ```
 
 **Generated files:**
-- `data/old_testament.json` - Index of Hebrew Bible/Old Testament books
+- `data/old_testament.json` - Index of Hebrew Bible books
 - `data/new_testament.json` - Index of New Testament books
 
 **Dependencies:**
@@ -85,12 +85,12 @@ def normalize_book_name_to_filename(book_name):
     """Convert book name from Books.json to actual JSON filename format."""
     
 def create_bible_indexes():
-    """Create Old and New Testament index files."""
+    """Create Hebrew Bible and New Testament index files."""
 ```
 
 **Process:**
 1. Reads `data/bible-kjv/Books.json` to get official book list
-2. Separates books into Old Testament and New Testament
+2. Separates books into Hebrew Bible and New Testament
 3. Normalizes book names to match actual JSON filenames
 4. Creates index files with path mappings
 5. Validates file existence
