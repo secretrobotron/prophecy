@@ -23,29 +23,29 @@ The Prophecy project bridges the gap between traditional biblical organization (
 ```
 prophecy/
 ├── data/
-│   ├── bible-kjv/         # KJV Bible JSON files (submodule)
-│   ├── stories.yml        # Story definitions with verse ranges
-│   ├── prompts.tsv        # Sentiment analysis prompts
-│   ├── index.json         # Hebrew Bible book index
-│   └── template.txt       # AI prompt template
-├── prophecy/              # Python package
-│   ├── __init__.py        # Package initialization
-│   ├── bible.py           # Bible text access classes
-│   ├── stories.py         # Story extraction and analysis
-│   ├── prompts.py         # Prompts management
-│   └── ai_providers.py    # AI integration (OpenAI, etc.)
-├── examples/              # Demonstration scripts
-│   ├── bible_api_demo.py  # Bible API usage examples
-│   ├── ai_provider_demo.py # AI analysis examples
-│   └── prompts_usage_demo.py # Prompts system demo
-├── scripts/               # Utility scripts
-│   ├── create_bible_indexes.py # Index generation
-│   └── example_usage.py   # Setup verification
-└── tests/                 # Test suite
-    ├── test_bible.py      # Bible API tests
+│   ├── bible-kjv/                # KJV Bible JSON files (submodule)
+│   ├── stories.yml               # Story definitions with verse ranges
+│   ├── prompts.tsv               # Sentiment analysis prompts
+│   ├── index.json                # Hebrew Bible book index
+│   └── template.txt              # AI prompt template
+├── prophecy/                     # Python package
+│   ├── __init__.py               # Package initialization
+│   ├── bible.py                  # Bible text access classes
+│   ├── stories.py                # Story extraction and analysis
+│   ├── prompts.py                # Prompts management
+│   └── ai_providers.py           # AI integration (OpenAI, etc.)
+├── examples/                     # Demonstration scripts
+│   ├── bible_api_demo.py         # Bible API usage examples
+│   ├── ai_provider_demo.py       # AI analysis examples
+│   └── prompts_usage_demo.py     # Prompts system demo
+├── scripts/                      # Utility scripts
+│   ├── create_bible_indexes.py   # Index generation
+│   └── example_usage.py          # Setup verification
+└── tests/                        # Test suite
+    ├── test_bible.py             # Bible API tests
     ├── test_stories_structure.py # Data integrity tests
-    ├── test_prompts.py    # Prompts validation tests
-    └── test_*.py          # Additional test modules
+    ├── test_prompts.py           # Prompts validation tests
+    └── test_*.py                 # Additional test modules
 ```
 
 ## Data Sources
