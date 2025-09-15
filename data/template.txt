@@ -1,0 +1,33 @@
+You are tasked to assess a fragment of the Hebrew Bible in the KJV translation. 
+You will answer three true/false questions. For each question, you will provide
+the reasoning for your answer and an assessment of your certainty, ranging from
+0% (fully uncertain) to 100% (fully certain). The first question is about 
+historical context, the second about the applicability of a topic (short term)
+to the provided text, and the third about the applicability of a longer statement 
+to the text. The fragment is provided at the end of the prompt. You will answer 
+only with valid JSON, as follows:
+
+{
+  "period":{
+    "answer":true,
+    "certainty":100,
+  },
+  "topic":{
+    "answer":true,
+    "certainty":100,
+  },
+  "prompt":{
+    "answer":true,
+    "certainty":100,
+  }
+}
+
+Question 1: The fragment originates in the $period period.
+
+Question 2: The fragment pertains to the topic: "$topic".
+
+Question 3: The following statement applies to the fragment: "$prompt"
+
+Below is the text fragment:
+
+$text
