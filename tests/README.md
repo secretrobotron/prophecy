@@ -2,97 +2,277 @@
 
 This directory contains pytest tests to validate the structure and content of the prophecy project data files.
 
+# Prophecy Tests
+
+This directory contains comprehensive pytest tests to validate the functionality, structure, and content of the prophecy project.
+
 ## Test Files
 
-### test_prompts.py
+### Core API Tests
 
-Comprehensive tests for validating the structure and content of `data/prompts.tsv` according to the project requirements:
+#### test_bible.py
+Tests for the Bible class API functionality:
+- Bible initialization and configuration
+- Text extraction from various verse ranges
+- Error handling for invalid inputs
+- Book information retrieval
+- Caching behavior
+- Environment variable configuration
 
-1. **File Format Validation**
-   - File exists in the data directory
-   - File is properly tab-separated with exactly four columns
-   - All rows have consistent column count
+#### test_stories.py
+Tests for the Stories and Story classes:
+- Story loading from YAML files
+- Story text extraction
+- Story metadata access
+- Integration with Bible API
 
-2. **Header Validation**
-   - Headers are exactly: `id`, `period`, `topic`, and `prompt`
-   - Headers are in the correct order
+#### test_ai_providers.py
+Tests for AI provider integration:
+- ChatGPT provider functionality
+- AI provider factory pattern
+- Error handling for API issues
+- Text analysis capabilities
+- Configuration management
 
-3. **Data Integrity Validation**
-   - All values in the `id` column are unique within the file
-   - No empty cells in any of the required columns
-   - ID values are valid non-empty strings
+#### test_prompts_class.py
+Tests for the Prompts class:
+- Prompts loading from TSV files
+- Filtering by topic and period
+- Data structure validation
+- Integration with AI providers
 
-4. **Format Consistency**
-   - Consistent tab separation throughout the file
-   - File contains a reasonable amount of data
-   - Proper delimiter usage (tabs vs commas)
+### Data Integrity Tests
 
-### test_stories_structure.py
-
-Comprehensive tests for validating the structure of `data/stories.yml` according to the project requirements:
-
-1. **Story Structure Validation**
-   - Every top-level entry is a bible story title
-   - Each story contains required fields: `book` and `verses`
+#### test_stories_structure.py
+Comprehensive validation of `data/stories.yml`:
+1. **YAML Structure Validation**
+   - File loads successfully as valid YAML
+   - Story entries have required fields (`book`, `verses`)
+   - Story titles are valid strings
 
 2. **Book Reference Validation**
-   - All book references exist in `data/old_testament.json`
-   - Book names are properly formatted strings
+   - All book references exist in `data/index.json`
+   - Book names are properly formatted
 
 3. **Verse Format Validation**
-   - Verses follow the format: `chapter:verse-chapter:verse`
-   - All elements are integers
+   - Verses follow format: `chapter:verse-chapter:verse`
+   - All elements are valid integers
    - Verse ranges are logically valid (start ≤ end)
 
-4. **Bible Data Validation**
-   - All referenced chapters exist in the corresponding bible book files
-   - All referenced verses exist in the specified chapters
-   - Data integrity between stories.yml and bible JSON files
+4. **Bible Data Integration**
+   - Referenced chapters exist in Bible JSON files
+   - Referenced verses exist in specified chapters
+   - Data consistency between stories.yml and Bible data
+
+#### test_prompts.py
+Validation of `data/prompts.tsv` structure and content:
+1. **File Format Validation**
+   - File exists and is accessible
+   - Proper tab-separated format with four columns
+   - Consistent column count across all rows
+
+2. **Header Validation**
+   - Headers are exactly: `id`, `period`, `topic`, `prompt`
+   - Headers are in correct order
+
+3. **Data Integrity**
+   - All ID values are unique
+   - No empty cells in required columns
+   - Valid data types and formats
+
+4. **Content Validation**
+   - Reasonable amount of data
+   - Consistent delimiter usage
+   - Valid prompt content
 
 ## Running Tests
 
-### Run all tests:
+### Run All Tests
 ```bash
-pytest
-```
-
-### Run with verbose output:
-```bash
+# All tests with verbose output
 pytest -v
+
+# All tests with coverage report
+pytest --cov=prophecy tests/
+
+# Run tests in parallel (if pytest-xdist is installed)
+pytest -n auto
 ```
 
-### Run specific test file:
+### Run Specific Test Categories
 ```bash
-pytest tests/test_stories_structure.py
+# Core API tests
+pytest tests/test_bible.py tests/test_stories.py tests/test_prompts_class.py -v
+
+# Data integrity tests
+pytest tests/test_stories_structure.py tests/test_prompts.py -v
+
+# AI provider tests (requires API keys)
+pytest tests/test_ai_providers.py -v
 ```
 
-### Run specific test method:
+### Run Individual Test Files
 ```bash
-pytest tests/test_stories_structure.py::TestStoriesStructure::test_verses_format_is_valid
+# Bible API tests
+pytest tests/test_bible.py -v
+
+# Stories structure validation
+pytest tests/test_stories_structure.py -v
+
+# Prompts data validation
+pytest tests/test_prompts.py -v
+```
+
+### Run Specific Test Methods
+```bash
+# Test specific functionality
+pytest tests/test_bible.py::TestBible::test_get_text_with_range_string -v
+
+# Test specific data validation
+pytest tests/test_stories_structure.py::TestStoriesStructure::test_verses_format_is_valid -v
 ```
 
 ## Test Requirements
 
 The tests require the following Python packages:
-- pytest
-- pyyaml
+- **pytest** - Testing framework
+- **pyyaml** - YAML file processing
+- **openai** - AI provider integration (for AI tests)
+- **requests** - HTTP requests (for AI provider tests)
+- **pandas** - Data processing (for prompts tests)
 
-These should be installed automatically when running the tests for the first time.
+Install all dependencies:
+```bash
+pip install pytest pyyaml openai requests pandas
+# OR use the project environment
+conda env create -f environment.yml
+conda activate prophecy
+```
 
-## Test Coverage
+## Test Configuration
 
-The tests verify that:
-- `data/stories.yml` has the correct YAML structure
-- Story titles are valid strings
-- Each story references a valid Old Testament book
-- Verse ranges use the correct format and reference valid bible passages
-- The bible book JSON files contain the referenced chapters and verses
-- Stories cover a reasonable variety of Old Testament books (at least 10)
+Tests are configured in `setup.cfg`:
+```ini
+[tool:pytest]
+testpaths = tests
+python_files = test_*.py
+python_classes = Test*
+python_functions = test_*
+addopts = -v --tb=short
+```
+
+## Test Coverage Areas
+
+### Data Validation
+- ✅ YAML structure and format validation
+- ✅ TSV file format and content validation  
+- ✅ Bible JSON data integrity
+- ✅ Cross-reference validation between data files
+- ✅ Verse range format validation
+
+### API Functionality
+- ✅ Bible text extraction with various input formats
+- ✅ Story loading and text retrieval
+- ✅ Prompts system functionality
+- ✅ AI provider integration
+- ✅ Error handling and edge cases
+
+### Integration Testing
+- ✅ End-to-end workflows
+- ✅ Data consistency across modules
+- ✅ Environment configuration
+- ✅ File system operations
+
+## Continuous Integration
+
+Tests are designed to work in CI environments:
+- No external dependencies for core tests
+- Clear separation of unit and integration tests
+- Configurable test environments
+- Comprehensive error reporting
+
+## Troubleshooting Tests
+
+### Common Issues
+
+**Missing dependencies:**
+```bash
+pip install -r requirements.txt
+# OR install individual packages as needed
+```
+
+**Missing data files:**
+```bash
+# Initialize Bible submodule
+git submodule init && git submodule update
+```
+
+**AI provider test failures:**
+```bash
+# Set up API keys for AI tests
+export OPENAI_API_KEY="your-key-here"
+```
+
+**Permission errors:**
+```bash
+# Ensure proper file permissions
+chmod -R 755 data/
+```
 
 ## Adding New Tests
 
-When adding new tests, follow these guidelines:
-- Use descriptive test method names starting with `test_`
-- Add appropriate assertions with helpful error messages
-- Use fixtures for loading data to avoid repeated file I/O
-- Document any new requirements or validation rules
+### Guidelines for New Tests
+
+1. **Naming Convention**
+   - Use descriptive test method names starting with `test_`
+   - Group related tests in classes starting with `Test`
+   - Use clear, self-documenting names
+
+2. **Test Structure**
+   ```python
+   def test_specific_functionality_description(self):
+       """Test description explaining what is being tested."""
+       # Arrange
+       setup_code()
+       
+       # Act
+       result = function_under_test()
+       
+       # Assert
+       assert result == expected_value, "Clear error message"
+   ```
+
+3. **Error Handling**
+   - Test both success and failure cases
+   - Verify appropriate exceptions are raised
+   - Include clear assertion messages
+
+4. **Data Management**
+   - Use fixtures for shared test data
+   - Clean up temporary files
+   - Use mock data when appropriate
+
+5. **Documentation**
+   - Document test purpose and requirements
+   - Update this README when adding new test files
+   - Include examples of expected behavior
+
+### Example Test Addition
+
+```python
+# tests/test_new_feature.py
+import pytest
+from prophecy.new_feature import NewFeature
+
+class TestNewFeature:
+    def test_new_feature_initialization(self):
+        """Test that NewFeature initializes correctly."""
+        feature = NewFeature()
+        assert feature is not None
+        assert hasattr(feature, 'expected_attribute')
+    
+    def test_new_feature_with_invalid_input(self):
+        """Test that NewFeature handles invalid input appropriately."""
+        with pytest.raises(ValueError, match="Expected error message"):
+            NewFeature(invalid_parameter=True)
+```

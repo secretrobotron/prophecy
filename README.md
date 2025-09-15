@@ -13,7 +13,10 @@ The Prophecy project bridges the gap between traditional biblical organization (
 - **Structured Data Format**: JSON-based Bible text with chapter/verse organization
 - **Testament Indexes**: Index of Hebrew Bible books from the KJV translation
 - **Flexible Text Extraction**: Retrieve stories by name, book, or custom verse ranges
-- **Clean API Design**: Object-oriented Python modules for easy integration
+- **Clean Python API**: Object-oriented modules for easy integration
+- **AI Integration**: Built-in support for OpenAI and other AI providers for text analysis
+- **Sentiment Analysis**: Curated prompts for biblical text sentiment analysis
+- **Comprehensive Testing**: Full test suite ensuring data integrity and API reliability
 
 ## Project Structure
 
@@ -22,13 +25,27 @@ prophecy/
 ├── data/
 │   ├── bible-kjv/         # KJV Bible JSON files (submodule)
 │   ├── stories.yml        # Story definitions with verse ranges
-│   └── index.json         # HB book index
-├── prophecy/              # Python package (planned)
+│   ├── prompts.tsv        # Sentiment analysis prompts
+│   ├── index.json         # Hebrew Bible book index
+│   └── template.txt       # AI prompt template
+├── prophecy/              # Python package
+│   ├── __init__.py        # Package initialization
 │   ├── bible.py           # Bible text access classes
 │   ├── stories.py         # Story extraction and analysis
-│   └── utils.py           # Utility functions
-├── scripts/               # Development utilities
+│   ├── prompts.py         # Prompts management
+│   └── ai_providers.py    # AI integration (OpenAI, etc.)
+├── examples/              # Demonstration scripts
+│   ├── bible_api_demo.py  # Bible API usage examples
+│   ├── ai_provider_demo.py # AI analysis examples
+│   └── prompts_usage_demo.py # Prompts system demo
+├── scripts/               # Utility scripts
+│   ├── create_bible_indexes.py # Index generation
+│   └── example_usage.py   # Setup verification
 └── tests/                 # Test suite
+    ├── test_bible.py      # Bible API tests
+    ├── test_stories_structure.py # Data integrity tests
+    ├── test_prompts.py    # Prompts validation tests
+    └── test_*.py          # Additional test modules
 ```
 
 ## Data Sources
@@ -50,27 +67,80 @@ prophecy/
 - Computational analysis of biblical language patterns
 - Cross-referencing themes and motifs
 
-## Quick Start
+### Software Development
+- Building biblical study applications
+- Creating educational software
+- Developing content management systems for religious texts
+
+## Running Examples
+
+The project includes comprehensive example scripts:
+
+```bash
+# Test the Bible API
+python examples/bible_api_demo.py
+
+# Explore AI-powered analysis (requires OpenAI API key)
+export OPENAI_API_KEY="your-key-here"
+python examples/ai_provider_demo.py
+
+# Learn about the prompts system
+python examples/prompts_usage_demo.py
+```
+
+See `examples/README.md` for detailed documentation of all demonstration scripts.
+
+## Installation and Setup
+
+### Prerequisites
+```bash
+# Clone the repository
+git clone https://github.com/rvosa/prophecy.git
+cd prophecy
+
+# Initialize Bible data submodule
+git submodule init
+git submodule update
+
+# Install Python dependencies
+pip install pyyaml openai requests pandas
+# OR use conda environment
+conda env create -f environment.yml
+conda activate prophecy
+```
+
+### Quick Start
 
 ```python
-# Load biblical stories
+# Import the main Bible API
+from prophecy.bible import Bible
+
+# Initialize with default data folder
+bible = Bible()
+
+# Extract the Creation story
+creation_text = bible.get_text('Genesis', {'range': '1:1-2:7'})
+print(f"Creation story: {len(creation_text.split())} words")
+
+# Load stories from YAML
 import yaml
 with open('data/stories.yml') as f:
     stories = yaml.safe_load(f)
 
-# Access story information
-creation_story = stories['The Creation']
-print(f"Book: {creation_story['book']}")
-print(f"Verses: {creation_story['verses']}")
+# Extract a complete story
+flood_story = stories['The Great Flood']
+flood_text = bible.get_text(flood_story['book'], 
+                           {'range': flood_story['verses'][0]})
 
-# Load testament indexes
-import json
-with open('data/index.json') as f:
-    books = json.load(f)
+# Use the Stories API for easier access
+from prophecy.stories import Stories
+story_api = Stories()
+story_text = story_api.get_story_text('The Creation')
 
-# Get path to Genesis
-genesis_path = books['Genesis']
-# Returns: "data/bible-kjv/Genesis.json"
+# AI-powered analysis (requires OpenAI API key)
+from prophecy.ai_providers import ChatGPTProvider
+ai = ChatGPTProvider()
+analysis = ai.analyze_text(creation_text, "Analyze the tone and themes")
 ```
 
 ## Story Coverage
@@ -93,19 +163,54 @@ Stories use standard biblical citation format:
 
 ## Development Status
 
-- ✅ **Data Layer**: Complete Bible text, story definitions, indexes
+- ✅ **Data Layer**: Complete Bible text, story definitions, indexes, and prompts
 - ✅ **Story Mapping**: 72+ stories with precise verse ranges
-- 🔄 **Testing**: Comprehensive test suite planned
-- 🔄 **Python Package**: Object-oriented API in development
-- 📋 **Documentation**: API docs and tutorials planned
+- ✅ **Python Package**: Full object-oriented API with Bible, Stories, Prompts, and AI integration
+- ✅ **Testing**: Comprehensive test suite for data integrity and API functionality
+- ✅ **Examples**: Working demonstration scripts for all major features
+- ✅ **AI Integration**: OpenAI and other AI provider support for text analysis
+- 📋 **Documentation**: Ongoing improvements and API reference
 
 ## Contributing
 
-Contributions welcome! Areas of need:
-- Additional Hebrew Bible narratives
-- Python API development
-- Documentation and examples
-- Test coverage
+Contributions welcome! Areas of interest:
+
+### Data Enhancement
+- Additional Hebrew Bible narratives for `stories.yml`
+- New sentiment analysis prompts for `prompts.tsv`
+- Cross-references between stories
+- Alternative biblical translations
+
+### Code Development
+- Additional AI provider integrations
+- Enhanced text analysis features
+- Performance optimizations
+- API extensions
+
+### Testing and Documentation
+- Additional test coverage
+- Documentation improvements
+- Example scripts and tutorials
+- Integration guides
+
+### Getting Started with Development
+
+1. **Fork and clone the repository**
+2. **Set up development environment:**
+   ```bash
+   git submodule init && git submodule update
+   pip install -r requirements.txt  # or use environment.yml
+   ```
+3. **Run tests to ensure everything works:**
+   ```bash
+   python -m pytest tests/ -v
+   ```
+4. **Verify examples work:**
+   ```bash
+   python examples/bible_api_demo.py
+   ```
+
+See individual README files in `data/`, `examples/`, `scripts/`, and `tests/` directories for specific contribution guidelines.
 
 ## License
 
