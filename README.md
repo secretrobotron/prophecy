@@ -1,4 +1,4 @@
-# Hebrew Bible Text Analysis and Story Extraction
+# 📜 Hebrew Bible Text Analysis and Story Extraction
 
 A Python toolkit for analyzing biblical texts, extracting stories, and working with structured biblical data. This project provides programmatic access to the Bible organized by stories rather than just chapters and verses.
 
