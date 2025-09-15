@@ -4,6 +4,29 @@ This directory contains pytest tests to validate the structure and content of th
 
 ## Test Files
 
+### test_prompts.py
+
+Comprehensive tests for validating the structure and content of `data/prompts.tsv` according to the project requirements:
+
+1. **File Format Validation**
+   - File exists in the data directory
+   - File is properly tab-separated with exactly four columns
+   - All rows have consistent column count
+
+2. **Header Validation**
+   - Headers are exactly: `id`, `period`, `topic`, and `prompt`
+   - Headers are in the correct order
+
+3. **Data Integrity Validation**
+   - All values in the `id` column are unique within the file
+   - No empty cells in any of the required columns
+   - ID values are valid non-empty strings
+
+4. **Format Consistency**
+   - Consistent tab separation throughout the file
+   - File contains a reasonable amount of data
+   - Proper delimiter usage (tabs vs commas)
+
 ### test_stories_structure.py
 
 Comprehensive tests for validating the structure of `data/stories.yml` according to the project requirements:
