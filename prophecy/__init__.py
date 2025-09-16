@@ -7,15 +7,20 @@ rather than just chapters and verses.
 
 from .bible import Bible
 from .stories import Stories, Story
-from .ai_providers import AIProvider, ChatGPTProvider, AIProviderFactory, AIProviderError
+from .prompts import Prompts
 
 __version__ = "0.1.0"
 __all__ = [
     "Bible", 
     "Stories", 
-    "Story", 
-    "AIProvider", 
-    "ChatGPTProvider", 
-    "AIProviderFactory", 
-    "AIProviderError"
+    "Story",
+    "Prompts"
 ]
+
+# Conditionally import AI providers (requires openai dependency)
+try:
+    from .ai_providers import AIProvider, ChatGPTProvider, AIProviderFactory, AIProviderError
+    __all__.extend(["AIProvider", "ChatGPTProvider", "AIProviderFactory", "AIProviderError"])
+except ImportError:
+    # AI providers not available (missing openai dependency)
+    pass
