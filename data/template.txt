@@ -1,7 +1,7 @@
 You are tasked to assess a fragment of the Hebrew Bible in the KJV translation. 
 You will be provided with a text fragment and a statement where you have to 
 assess whether the statement applies to the provided text. You will formulate
-your answer as valid JSON, structured as follows:
+your answer as pure and valid JSON, without enclosing blocks, structured as follows:
 
 {
   "answer":true,
