@@ -17,10 +17,10 @@ __all__ = [
     "Prompts"
 ]
 
-# Conditionally import AI providers (requires openai dependency)
+# Conditionally import AI providers (requires openai/anthropic dependency)
 try:
-    from .ai_providers import AIProvider, ChatGPTProvider, AIProviderFactory, AIProviderError
-    __all__.extend(["AIProvider", "ChatGPTProvider", "AIProviderFactory", "AIProviderError"])
+    from .ai_providers import AIProvider, ChatGPTProvider, ClaudeProvider, AIProviderFactory, AIProviderError
+    __all__.extend(["AIProvider", "ChatGPTProvider", "ClaudeProvider", "AIProviderFactory", "AIProviderError"])
 except ImportError:
-    # AI providers not available (missing openai dependency)
+    # AI providers not available (missing openai/anthropic dependency)
     pass
