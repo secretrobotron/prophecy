@@ -13,6 +13,14 @@ from typing import List, Dict, Any
 # Import modules directly to avoid dependency issues
 from .stories import Stories
 from .prompts import Prompts
+from .bible import Bible
+
+# Try to import AI providers (optional if openai not available)
+try:
+    from .ai_providers import AIProviderFactory, AIProviderError
+    AI_PROVIDERS_AVAILABLE = True
+except ImportError:
+    AI_PROVIDERS_AVAILABLE = False
 
 
 def validate_story_arg(stories_obj: Stories, stories_arg: str) -> List[str]:
@@ -66,7 +74,7 @@ def validate_prompt_arg(prompts_obj: Prompts, prompt_arg: str) -> List[Dict[str,
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
-        description='Extract biblical stories and prompts',
+        description='Extract biblical stories, populate prompts, and get AI responses',
         prog='python -m prophecy'
     )
     
@@ -92,6 +100,19 @@ def main():
         help='API key for AI services (overrides OPENAI_API_KEY environment variable)'
     )
     
+    parser.add_argument(
+        '--ai-provider',
+        default='chatgpt',
+        choices=['chatgpt', 'openai'],
+        help='AI provider to use (default: chatgpt)'
+    )
+    
+    parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='Show populated templates without sending to AI provider'
+    )
+    
     args = parser.parse_args()
     
     try:
@@ -102,13 +123,14 @@ def main():
         if args.api_key:
             os.environ['OPENAI_API_KEY'] = args.api_key
         
-        # Initialize Stories and Prompts
+        # Initialize components
         try:
             stories = Stories(data_folder=args.data)
             prompts = Prompts(data_folder=args.data)
+            bible = Bible(data_folder=args.data)
         except FileNotFoundError as e:
             print(f"Error: {e}", file=sys.stderr)
-            print("Please ensure the data folder contains stories.yml and prompts.tsv", file=sys.stderr)
+            print("Please ensure the data folder contains stories.yml, prompts.tsv, and bible data", file=sys.stderr)
             sys.exit(1)
         except Exception as e:
             print(f"Error initializing data: {e}", file=sys.stderr)
@@ -128,28 +150,95 @@ def main():
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)
         
-        # Extract and output stories and prompts
-        print(f"=== Prophecy Extraction ===")
+        # Initialize AI provider if not doing dry run
+        ai_provider = None
+        if not args.dry_run:
+            if not AI_PROVIDERS_AVAILABLE:
+                print("Error: AI providers not available. Install 'openai' package or use --dry-run", file=sys.stderr)
+                sys.exit(1)
+            
+            try:
+                ai_provider = AIProviderFactory.create_provider(
+                    args.ai_provider,
+                    api_key=args.api_key or os.getenv('OPENAI_API_KEY')
+                )
+                
+                if not ai_provider.validate_configuration():
+                    print("Error: AI provider configuration is invalid", file=sys.stderr)
+                    sys.exit(1)
+                    
+            except (ValueError, AIProviderError) as e:
+                print(f"Error: Failed to initialize AI provider: {e}", file=sys.stderr)
+                if "API key" in str(e):
+                    print("Make sure to set OPENAI_API_KEY environment variable or use --api-key", file=sys.stderr)
+                sys.exit(1)
+        
+        # Process each story-prompt combination
+        print(f"=== Prophecy Processing ===")
         print(f"Stories: {len(story_titles)}")
         print(f"Prompts: {len(prompt_list)}")
+        print(f"Mode: {'Dry run' if args.dry_run else f'AI Provider: {args.ai_provider}'}")
         print()
         
-        # Output stories
-        print("=== STORIES ===")
-        for i, story_title in enumerate(story_titles, 1):
+        total_combinations = len(story_titles) * len(prompt_list)
+        current_combination = 0
+        
+        for story_title in story_titles:
             story = stories.get_story(story_title)
-            print(f"{i}. {story}")
             
-        print()
+            # Get biblical text for the story
+            try:
+                biblical_text = bible.get_text(story.book, *story.to_bible_parts())
+            except Exception as e:
+                print(f"Warning: Could not get biblical text for {story_title}: {e}", file=sys.stderr)
+                biblical_text = f"[Biblical text not available for {story.book}]"
+            
+            for prompt_record in prompt_list:
+                current_combination += 1
+                
+                print(f"--- Combination {current_combination}/{total_combinations} ---")
+                print(f"Story: {story.title} ({story.book})")
+                print(f"Prompt: #{prompt_record['id']} - {prompt_record['topic']}")
+                print()
+                
+                # Populate template
+                try:
+                    populated_template = prompts.populate_template(prompt_record, story, biblical_text)
+                except Exception as e:
+                    print(f"Error: Failed to populate template: {e}", file=sys.stderr)
+                    continue
+                
+                if args.dry_run:
+                    # Just show the populated template
+                    print("=== POPULATED TEMPLATE ===")
+                    print(populated_template)
+                    print("=" * 50)
+                    print()
+                else:
+                    # Send to AI provider and get response
+                    try:
+                        print("Sending to AI provider...")
+                        ai_response = ai_provider.post_prompt(
+                            populated_template,
+                            system_message="You are a biblical scholar analyzing ancient texts."
+                        )
+                        
+                        print("=== AI RESPONSE ===")
+                        print(ai_response)
+                        print("=" * 50)
+                        print()
+                        
+                    except AIProviderError as e:
+                        print(f"Error: AI provider failed: {e}", file=sys.stderr)
+                        print("Skipping this combination...", file=sys.stderr)
+                        continue
+                    except Exception as e:
+                        print(f"Error: Unexpected AI error: {e}", file=sys.stderr)
+                        print("Skipping this combination...", file=sys.stderr)
+                        continue
         
-        # Output prompts
-        print("=== PROMPTS ===")
-        for i, prompt in enumerate(prompt_list, 1):
-            print(f"{i}. ID: {prompt['id']}")
-            print(f"   Period: {prompt['period']}")
-            print(f"   Topic: {prompt['topic']}")
-            print(f"   Prompt: {prompt['prompt']}")
-            print()
+        print(f"=== Processing Complete ===")
+        print(f"Processed {current_combination} story-prompt combinations")
     
     except KeyboardInterrupt:
         print("\nAborted by user", file=sys.stderr)
