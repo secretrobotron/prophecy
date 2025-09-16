@@ -7,7 +7,7 @@ The Prophecy Python package provides programmatic access to biblical texts with 
 The package is included in this repository. To use it, ensure dependencies are installed:
 
 ```bash
-pip install pyyaml openai requests pandas
+pip install pyyaml openai anthropic requests pandas
 # OR use conda environment
 conda env create -f environment.yml
 conda activate prophecy
@@ -16,7 +16,7 @@ conda activate prophecy
 ## Quick Start
 
 ```python
-from prophecy import Bible, Stories, ChatGPTProvider
+from prophecy import Bible, Stories, ChatGPTProvider, ClaudeProvider
 
 # Initialize Bible API
 bible = Bible()
@@ -34,9 +34,14 @@ print(f"Verses: {story.verses}")
 # Get story text directly
 story_text = stories.get_story_text('The Creation')
 
-# AI-powered analysis (requires OpenAI API key)
-ai = ChatGPTProvider()
-analysis = ai.analyze_text(creation_text, "Analyze the literary themes")
+# AI-powered analysis (requires API keys)
+# Using ChatGPT
+ai = ChatGPTProvider(api_key='your_openai_key')
+analysis = ai.post_prompt("Analyze the literary themes", system_message="You are a biblical scholar.")
+
+# Using Claude
+claude = ClaudeProvider(api_key='your_anthropic_key')
+analysis2 = claude.post_prompt("Analyze the literary themes", system_message="You are a biblical scholar.")
 ```
 
 ## API Reference
@@ -158,9 +163,11 @@ Represents a single biblical story.
 
 ### AI Provider Classes
 
-Support for AI-powered biblical text analysis.
+#### AI Providers
 
-#### ChatGPTProvider
+Support for AI-powered biblical text analysis with multiple providers.
+
+##### ChatGPTProvider
 
 ```python
 from prophecy import ChatGPTProvider
@@ -169,7 +176,19 @@ from prophecy import ChatGPTProvider
 ai = ChatGPTProvider()
 
 # Analyze text
-result = ai.analyze_text(text, prompt)
+result = ai.post_prompt("Analyze this text", system_message="You are a biblical scholar.")
+```
+
+##### ClaudeProvider
+
+```python
+from prophecy import ClaudeProvider
+
+# Initialize (requires ANTHROPIC_API_KEY environment variable)
+claude = ClaudeProvider()
+
+# Analyze text
+result = claude.post_prompt("Analyze this text", system_message="You are a biblical scholar.")
 ```
 
 #### AIProviderFactory
@@ -179,7 +198,11 @@ Factory for creating AI provider instances:
 ```python
 from prophecy import AIProviderFactory
 
-provider = AIProviderFactory.create_provider('chatgpt')
+# Create ChatGPT provider
+chatgpt_provider = AIProviderFactory.create_provider('chatgpt', api_key='your_key')
+
+# Create Claude provider
+claude_provider = AIProviderFactory.create_provider('claude', api_key='your_key')
 ```
 
 ### Prompts Class
@@ -252,21 +275,24 @@ print(f"Available stories: {len(all_stories)}")
 
 ```python
 import os
-from prophecy import Bible, ChatGPTProvider
+from prophecy import Bible, ChatGPTProvider, ClaudeProvider
 
-# Set up OpenAI API key
-os.environ['OPENAI_API_KEY'] = 'your-api-key-here'
+# Set up API keys
+os.environ['OPENAI_API_KEY'] = 'your-openai-api-key-here'
+os.environ['ANTHROPIC_API_KEY'] = 'your-anthropic-api-key-here'
 
 bible = Bible()
-ai = ChatGPTProvider()
 
-# Extract text and analyze
+# Using ChatGPT
+ai = ChatGPTProvider()
 text = bible.get_text('Genesis', {'range': '1:1-2:7'})
-analysis = ai.analyze_text(text, "Analyze the literary themes and tone")
+analysis = ai.post_prompt("Analyze the literary themes and tone", system_message="You are a biblical scholar.")
 print(analysis)
 
-# Sentiment analysis
-sentiment = ai.analyze_text(text, "What is the emotional tone of this passage?")
+# Using Claude
+claude = ClaudeProvider()
+analysis2 = claude.post_prompt("What is the emotional tone of this passage?", system_message="You are a biblical scholar.")
+print(analysis2)
 ```
 
 ### Prompts System
@@ -298,7 +324,7 @@ for prompt_data in sentiment_prompts:
 - **Book caching**: Efficiently caches loaded books to avoid repeated file reads
 - **Environment variable support**: Configure data folder via `PROPHECY_DATA_FOLDER`
 - **Comprehensive error handling**: Clear error messages for invalid inputs
-- **AI Integration**: Built-in support for OpenAI and other AI providers
+- **AI Integration**: Built-in support for OpenAI and Anthropic AI providers
 - **Sentiment Analysis**: Structured prompts system for biblical text analysis
 - **High-level APIs**: Multiple interfaces for different use cases (Bible, Stories, Prompts)
 

@@ -18,7 +18,15 @@ Concrete implementation for OpenAI's ChatGPT API:
 - Robust error handling for API failures
 - Support for system messages and conversation context
 
-### 3. Factory Pattern (`AIProviderFactory`)
+### 3. Claude Implementation (`ClaudeProvider`)
+Concrete implementation for Anthropic's Claude API:
+- Full Claude API integration with configurable parameters
+- Support for Claude 3 Haiku, Sonnet, and Opus models
+- Configurable temperature, max_tokens, and other parameters
+- Robust error handling for API failures
+- Support for system messages and conversation context
+
+### 4. Factory Pattern (`AIProviderFactory`)
 Centralized factory for creating AI provider instances:
 - `create_provider(name, **kwargs)` - Create provider by name
 - `get_available_providers()` - List available providers
@@ -34,6 +42,15 @@ ai_provider = AIProviderFactory.create_provider(
     'chatgpt',
     api_key='your_openai_api_key',
     model='gpt-3.5-turbo',
+    temperature=0.7,
+    max_tokens=1000
+)
+
+# Create a Claude provider
+claude_provider = AIProviderFactory.create_provider(
+    'claude',
+    api_key='your_anthropic_api_key',
+    model='claude-3-haiku-20240307',
     temperature=0.7,
     max_tokens=1000
 )
@@ -73,6 +90,7 @@ analysis = ai_provider.post_prompt(populated_template)
 ## Available Providers
 
 - `chatgpt` or `openai` - OpenAI ChatGPT integration
+- `claude` or `anthropic` - Anthropic Claude integration
 
 ## Configuration
 
@@ -82,8 +100,15 @@ analysis = ai_provider.post_prompt(populated_template)
 - `max_tokens` - Maximum response length (default: 1000)
 - `temperature` - Response creativity 0.0-2.0 (default: 0.7)
 
+### Claude Provider
+- `api_key` - Anthropic API key (or set `ANTHROPIC_API_KEY` environment variable)
+- `model` - Claude model to use (default: 'claude-3-haiku-20240307')
+- `max_tokens` - Maximum response length (default: 1000)
+- `temperature` - Response creativity 0.0-1.0 (default: 0.7)
+
 ### Environment Variables
 - `OPENAI_API_KEY` - Your OpenAI API key
+- `ANTHROPIC_API_KEY` - Your Anthropic API key
 
 ## Error Handling
 

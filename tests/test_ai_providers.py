@@ -8,10 +8,12 @@ import os
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 import openai
+import anthropic
 
 from prophecy.ai_providers import (
     AIProvider, 
     ChatGPTProvider, 
+    ClaudeProvider,
     AIProviderFactory, 
     AIProviderError
 )
@@ -364,8 +366,281 @@ class TestChatGPTProvider:
                 provider.list_available_models()
 
 
+class TestClaudeProvider:
+    """Test the Claude provider implementation."""
+    
+    def test_init_with_api_key(self):
+        """Test Claude provider initialization with API key."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic') as mock_anthropic:
+            provider = ClaudeProvider(api_key="test_key")
+            assert provider.api_key == "test_key"
+            assert provider.model == ClaudeProvider.DEFAULT_MODEL
+            assert provider.max_tokens == ClaudeProvider.DEFAULT_MAX_TOKENS
+            assert provider.temperature == ClaudeProvider.DEFAULT_TEMPERATURE
+            mock_anthropic.assert_called_once_with(api_key="test_key")
+    
+    def test_init_with_env_var(self):
+        """Test Claude provider initialization with environment variable."""
+        with patch.dict(os.environ, {'ANTHROPIC_API_KEY': 'env_key'}):
+            with patch('prophecy.ai_providers.anthropic.Anthropic') as mock_anthropic:
+                provider = ClaudeProvider()
+                assert provider.api_key == "env_key"
+                mock_anthropic.assert_called_once_with(api_key="env_key")
+    
+    def test_init_no_api_key(self):
+        """Test Claude provider initialization fails without API key."""
+        with patch.dict(os.environ, {}, clear=True):
+            with pytest.raises(AIProviderError, match="Anthropic API key not provided"):
+                ClaudeProvider()
+    
+    def test_init_with_custom_params(self):
+        """Test Claude provider initialization with custom parameters."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic'):
+            provider = ClaudeProvider(
+                api_key="test_key",
+                model="claude-3-opus-20240229",
+                max_tokens=2000,
+                temperature=0.5
+            )
+            assert provider.model == "claude-3-opus-20240229"
+            assert provider.max_tokens == 2000
+            assert provider.temperature == 0.5
+    
+    def test_init_anthropic_client_failure(self):
+        """Test Claude provider initialization fails when Anthropic client creation fails."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic', side_effect=Exception("Client creation failed")):
+            with pytest.raises(AIProviderError, match="Failed to initialize Anthropic client"):
+                ClaudeProvider(api_key="test_key")
+    
+    def test_post_prompt_success(self):
+        """Test successful prompt posting."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic') as mock_anthropic:
+            # Setup mock response
+            mock_response = Mock()
+            mock_response.content = [Mock()]
+            mock_response.content[0].text = "Test response from Claude"
+            
+            mock_client = Mock()
+            mock_client.messages.create.return_value = mock_response
+            mock_anthropic.return_value = mock_client
+            
+            provider = ClaudeProvider(api_key="test_key")
+            response = provider.post_prompt("Test prompt")
+            
+            assert response == "Test response from Claude"
+            mock_client.messages.create.assert_called_once()
+            
+            # Check the call arguments
+            call_args = mock_client.messages.create.call_args
+            assert call_args[1]['model'] == ClaudeProvider.DEFAULT_MODEL
+            assert call_args[1]['messages'][0]['role'] == 'user'
+            assert call_args[1]['messages'][0]['content'] == 'Test prompt'
+    
+    def test_post_prompt_with_system_message(self):
+        """Test prompt posting with system message."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic') as mock_anthropic:
+            mock_response = Mock()
+            mock_response.content = [Mock()]
+            mock_response.content[0].text = "Response with system context"
+            
+            mock_client = Mock()
+            mock_client.messages.create.return_value = mock_response
+            mock_anthropic.return_value = mock_client
+            
+            provider = ClaudeProvider(api_key="test_key")
+            response = provider.post_prompt(
+                "Test prompt", 
+                system_message="You are a helpful assistant."
+            )
+            
+            assert response == "Response with system context"
+            
+            # Check system message parameter
+            call_args = mock_client.messages.create.call_args
+            assert call_args[1]['system'] == 'You are a helpful assistant.'
+            assert call_args[1]['messages'][0]['role'] == 'user'
+            assert call_args[1]['messages'][0]['content'] == 'Test prompt'
+    
+    def test_post_prompt_with_overrides(self):
+        """Test prompt posting with parameter overrides."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic') as mock_anthropic:
+            mock_response = Mock()
+            mock_response.content = [Mock()]
+            mock_response.content[0].text = "Override response"
+            
+            mock_client = Mock()
+            mock_client.messages.create.return_value = mock_response
+            mock_anthropic.return_value = mock_client
+            
+            provider = ClaudeProvider(api_key="test_key")
+            response = provider.post_prompt(
+                "Test prompt",
+                model="claude-3-opus-20240229",
+                max_tokens=500,
+                temperature=0.2
+            )
+            
+            assert response == "Override response"
+            
+            # Check overridden parameters
+            call_args = mock_client.messages.create.call_args
+            assert call_args[1]['model'] == 'claude-3-opus-20240229'
+            assert call_args[1]['max_tokens'] == 500
+            assert call_args[1]['temperature'] == 0.2
+    
+    def test_post_prompt_empty_prompt(self):
+        """Test that empty prompt raises error."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic'):
+            provider = ClaudeProvider(api_key="test_key")
+            
+            with pytest.raises(AIProviderError, match="Prompt cannot be empty"):
+                provider.post_prompt("")
+            
+            with pytest.raises(AIProviderError, match="Prompt cannot be empty"):
+                provider.post_prompt("   ")
+    
+    def test_post_prompt_authentication_error(self):
+        """Test handling of authentication errors."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic') as mock_anthropic:
+            mock_client = Mock()
+            # Mock the authentication error
+            auth_error = anthropic.AuthenticationError("Invalid API key", response=Mock(), body={})
+            mock_client.messages.create.side_effect = auth_error
+            mock_anthropic.return_value = mock_client
+            
+            provider = ClaudeProvider(api_key="invalid_key")
+            
+            with pytest.raises(AIProviderError, match="Invalid Anthropic API key"):
+                provider.post_prompt("Test prompt")
+    
+    def test_post_prompt_rate_limit_error(self):
+        """Test handling of rate limit errors."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic') as mock_anthropic:
+            mock_client = Mock()
+            # Mock the rate limit error
+            rate_error = anthropic.RateLimitError("Rate limit exceeded", response=Mock(), body={})
+            mock_client.messages.create.side_effect = rate_error
+            mock_anthropic.return_value = mock_client
+            
+            provider = ClaudeProvider(api_key="test_key")
+            
+            with pytest.raises(AIProviderError, match="Anthropic API rate limit exceeded"):
+                provider.post_prompt("Test prompt")
+    
+    def test_post_prompt_api_error(self):
+        """Test handling of general API errors."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic') as mock_anthropic:
+            mock_client = Mock()
+            # Mock the API error
+            api_error = anthropic.APIError("API error", request=Mock(), body={})
+            mock_client.messages.create.side_effect = api_error
+            mock_anthropic.return_value = mock_client
+            
+            provider = ClaudeProvider(api_key="test_key")
+            
+            with pytest.raises(AIProviderError, match="Anthropic API error"):
+                provider.post_prompt("Test prompt")
+    
+    def test_post_prompt_unexpected_error(self):
+        """Test handling of unexpected errors."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic') as mock_anthropic:
+            mock_client = Mock()
+            mock_client.messages.create.side_effect = ValueError("Unexpected error")
+            mock_anthropic.return_value = mock_client
+            
+            provider = ClaudeProvider(api_key="test_key")
+            
+            with pytest.raises(AIProviderError, match="Unexpected error communicating with Claude"):
+                provider.post_prompt("Test prompt")
+    
+    def test_validate_configuration_valid(self):
+        """Test configuration validation with valid parameters."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic'):
+            provider = ClaudeProvider(api_key="test_key")
+            assert provider.validate_configuration() is True
+    
+    def test_validate_configuration_no_api_key(self):
+        """Test configuration validation fails without API key."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic'):
+            provider = ClaudeProvider(api_key="test_key")
+            provider.api_key = None
+            assert provider.validate_configuration() is False
+    
+    def test_validate_configuration_no_model(self):
+        """Test configuration validation fails without model."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic'):
+            provider = ClaudeProvider(api_key="test_key")
+            provider.model = None
+            assert provider.validate_configuration() is False
+    
+    def test_validate_configuration_invalid_max_tokens(self):
+        """Test configuration validation fails with invalid max_tokens."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic'):
+            provider = ClaudeProvider(api_key="test_key")
+            provider.max_tokens = 0
+            assert provider.validate_configuration() is False
+            
+            provider.max_tokens = -1
+            assert provider.validate_configuration() is False
+            
+            provider.max_tokens = "invalid"
+            assert provider.validate_configuration() is False
+    
+    def test_validate_configuration_invalid_temperature(self):
+        """Test configuration validation fails with invalid temperature."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic'):
+            provider = ClaudeProvider(api_key="test_key")
+            provider.temperature = -0.1
+            assert provider.validate_configuration() is False
+            
+            provider.temperature = 1.1
+            assert provider.validate_configuration() is False
+            
+            provider.temperature = "invalid"
+            assert provider.validate_configuration() is False
+    
+    def test_list_available_models_success(self):
+        """Test successful model listing."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic') as mock_anthropic:
+            mock_client = Mock()
+            mock_anthropic.return_value = mock_client
+            
+            provider = ClaudeProvider(api_key="test_key")
+            models = provider.list_available_models()
+            
+            # Should return known Claude models, sorted
+            expected_models = [
+                "claude-3-5-haiku-20241022",
+                "claude-3-5-sonnet-20240620",
+                "claude-3-5-sonnet-20241022",
+                "claude-3-haiku-20240307",
+                "claude-3-opus-20240229",
+                "claude-3-sonnet-20240229"
+            ]
+            assert models == expected_models
+    
+    def test_get_provider_name(self):
+        """Test getting provider name."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic'):
+            provider = ClaudeProvider(api_key="test_key")
+            assert provider.get_provider_name() == "ClaudeProvider"
+
+
 class TestAIProviderFactory:
     """Test the AI provider factory."""
+    
+    def test_create_claude_provider(self):
+        """Test creating Claude provider through factory."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic'):
+            provider = AIProviderFactory.create_provider('claude', api_key='test_key')
+            assert isinstance(provider, ClaudeProvider)
+            assert provider.api_key == 'test_key'
+    
+    def test_create_anthropic_provider_alias(self):
+        """Test creating provider using 'anthropic' alias."""
+        with patch('prophecy.ai_providers.anthropic.Anthropic'):
+            provider = AIProviderFactory.create_provider('anthropic', api_key='test_key')
+            assert isinstance(provider, ClaudeProvider)
     
     def test_create_chatgpt_provider(self):
         """Test creating ChatGPT provider through factory."""
@@ -402,7 +677,9 @@ class TestAIProviderFactory:
         providers = AIProviderFactory.get_available_providers()
         assert 'chatgpt' in providers
         assert 'openai' in providers
-        assert len(providers) >= 2
+        assert 'claude' in providers
+        assert 'anthropic' in providers
+        assert len(providers) >= 4
     
     def test_register_new_provider(self):
         """Test registering a new provider."""
@@ -488,8 +765,12 @@ class TestIntegration:
         with patch('prophecy.ai_providers.OpenAI'):
             chatgpt_provider = ChatGPTProvider(api_key="test")
         
-        # Both should implement the same interface
-        for provider in [mock_provider, chatgpt_provider]:
+        # Claude provider (mocked)
+        with patch('prophecy.ai_providers.anthropic.Anthropic'):
+            claude_provider = ClaudeProvider(api_key="test")
+        
+        # All should implement the same interface
+        for provider in [mock_provider, chatgpt_provider, claude_provider]:
             assert hasattr(provider, 'post_prompt')
             assert hasattr(provider, 'validate_configuration')
             assert hasattr(provider, 'get_provider_name')
