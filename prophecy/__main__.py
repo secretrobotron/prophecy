@@ -256,7 +256,7 @@ def process_all_combinations(stories, prompts, bible, story_titles, prompt_list,
             
             print(f"--- Combination {current_combination}/{total_combinations} ---")
             print(f"Story: {story.title} ({story.book})")
-            print(f"Prompt: #{prompt_record['id']} - {prompt_record['topic']}")
+            print(f"Prompt: #{prompt_record['id']} - {prompt_record['prompt']}")
             print()
             
             process_combination(prompts, story, prompt_record, biblical_text, ai_provider, args.dry_run)
