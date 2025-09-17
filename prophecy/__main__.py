@@ -6,6 +6,8 @@ This module provides a CLI for extracting biblical stories and prompts.
 """
 
 import argparse
+import json
+import logging
 import os
 import sys
 from typing import List, Dict, Any
@@ -113,7 +115,35 @@ def create_argument_parser() -> argparse.ArgumentParser:
         help='Show populated templates without sending to AI provider'
     )
     
+    parser.add_argument(
+        '--verbosity',
+        default='INFO',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        help='Set logging verbosity level (default: INFO)'
+    )
+    
     return parser
+
+
+def setup_logging(verbosity_level: str) -> logging.Logger:
+    """Set up logging to stderr with specified verbosity level."""
+    logger = logging.getLogger('prophecy')
+    logger.setLevel(getattr(logging, verbosity_level.upper()))
+    
+    # Remove any existing handlers to avoid duplicates
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    
+    # Create handler that writes to stderr
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setLevel(getattr(logging, verbosity_level.upper()))
+    
+    # Create formatter
+    formatter = logging.Formatter('%(levelname)s: %(message)s')
+    handler.setFormatter(formatter)
+    
+    logger.addHandler(handler)
+    return logger
 
 
 def setup_environment(args) -> None:
@@ -125,7 +155,7 @@ def setup_environment(args) -> None:
         os.environ['OPENAI_API_KEY'] = args.api_key
 
 
-def initialize_components(data_folder: str):
+def initialize_components(data_folder: str, logger: logging.Logger):
     """Initialize Stories, Prompts, and Bible components."""
     try:
         stories = Stories(data_folder=data_folder)
@@ -133,38 +163,38 @@ def initialize_components(data_folder: str):
         bible = Bible(data_folder=data_folder)
         return stories, prompts, bible
     except FileNotFoundError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        print("Please ensure the data folder contains stories.yml, prompts.tsv, and bible data", file=sys.stderr)
+        logger.error(f"{e}")
+        logger.error("Please ensure the data folder contains stories.yml, prompts.tsv, and bible data")
         sys.exit(1)
     except Exception as e:
-        print(f"Error initializing data: {e}", file=sys.stderr)
+        logger.error(f"Error initializing data: {e}")
         sys.exit(1)
 
 
-def validate_inputs(stories, prompts, args):
+def validate_inputs(stories, prompts, args, logger: logging.Logger):
     """Validate story and prompt arguments, return lists of items to process."""
     try:
         story_titles = validate_story_arg(stories, args.stories)
     except ValueError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        logger.error(f"{e}")
         sys.exit(1)
     
     try:
         prompt_list = validate_prompt_arg(prompts, args.prompt)
     except ValueError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        logger.error(f"{e}")
         sys.exit(1)
     
     return story_titles, prompt_list
 
 
-def initialize_ai_provider(args):
+def initialize_ai_provider(args, logger: logging.Logger):
     """Initialize AI provider if not in dry-run mode."""
     if args.dry_run:
         return None
     
     if not AI_PROVIDERS_AVAILABLE:
-        print("Error: AI providers not available. Install 'openai' package or use --dry-run", file=sys.stderr)
+        logger.error("AI providers not available. Install 'openai' package or use --dry-run")
         sys.exit(1)
     
     try:
@@ -174,38 +204,38 @@ def initialize_ai_provider(args):
         )
         
         if not ai_provider.validate_configuration():
-            print("Error: AI provider configuration is invalid", file=sys.stderr)
+            logger.error("AI provider configuration is invalid")
             sys.exit(1)
         
         return ai_provider
         
     except (ValueError, AIProviderError) as e:
-        print(f"Error: Failed to initialize AI provider: {e}", file=sys.stderr)
+        logger.error(f"Failed to initialize AI provider: {e}")
         if "API key" in str(e):
-            print("Make sure to set OPENAI_API_KEY environment variable or use --api-key", file=sys.stderr)
+            logger.error("Make sure to set OPENAI_API_KEY environment variable or use --api-key")
         sys.exit(1)
 
 
-def get_biblical_text(bible, story):
+def get_biblical_text(bible, story, logger: logging.Logger):
     """Get biblical text for a story, with fallback for missing data."""
     try:
         return bible.get_text(story.book, *story.to_bible_parts())
     except Exception as e:
-        print(f"Warning: Could not get biblical text for {story.title}: {e}", file=sys.stderr)
+        logger.warning(f"Could not get biblical text for {story.title}: {e}")
         return f"[Biblical text not available for {story.book}]"
 
 
-def process_combination(prompts, story, prompt_record, biblical_text, ai_provider, is_dry_run):
+def process_combination(prompts, story, prompt_record, biblical_text, ai_provider, is_dry_run, logger: logging.Logger):
     """Process a single story-prompt combination."""
     # Populate template
     try:
         populated_template = prompts.populate_template(prompt_record, story, biblical_text)
     except Exception as e:
-        print(f"Error: Failed to populate template: {e}", file=sys.stderr)
+        logger.error(f"Failed to populate template: {e}")
         return False
     
     if is_dry_run:
-        # Just show the populated template
+        # Just show the populated template (this goes to stdout as before)
         print("=== POPULATED TEMPLATE ===")
         print(populated_template)
         print("=" * 50)
@@ -213,56 +243,67 @@ def process_combination(prompts, story, prompt_record, biblical_text, ai_provide
     else:
         # Send to AI provider and get response
         try:
-            print("Sending to AI provider...")
+            logger.info("Sending to AI provider...")
             ai_response = ai_provider.post_prompt(
                 populated_template,
                 system_message="You are a biblical scholar analyzing ancient texts."
             )
             
-            print("=== AI RESPONSE ===")
-            print(ai_response)
-            print("=" * 50)
-            print()
+            # Try to parse the AI response as JSON
+            try:
+                response_json = json.loads(ai_response)
+                # Add story title and prompt ID to the JSON
+                response_json["story"] = story.title
+                response_json["prompt"] = prompt_record["id"]
+                
+                # Output as flattened JSON line (to stdout for piping)
+                print(json.dumps(response_json, separators=(',', ':')))
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse AI response as JSON: {e}")
+                logger.debug(f"Raw AI response: {ai_response}")
+                return False
+            except Exception as e:
+                logger.error(f"Error processing JSON response: {e}")
+                return False
             
         except AIProviderError as e:
-            print(f"Error: AI provider failed: {e}", file=sys.stderr)
-            print("Skipping this combination...", file=sys.stderr)
+            logger.error(f"AI provider failed: {e}")
+            logger.info("Skipping this combination...")
             return False
         except Exception as e:
-            print(f"Error: Unexpected AI error: {e}", file=sys.stderr)
-            print("Skipping this combination...", file=sys.stderr)
+            logger.error(f"Unexpected AI error: {e}")
+            logger.info("Skipping this combination...")
             return False
     
     return True
 
 
-def process_all_combinations(stories, prompts, bible, story_titles, prompt_list, ai_provider, args):
+def process_all_combinations(stories, prompts, bible, story_titles, prompt_list, ai_provider, args, logger: logging.Logger):
     """Process all story-prompt combinations."""
-    print(f"=== Prophecy Processing ===")
-    print(f"Stories: {len(story_titles)}")
-    print(f"Prompts: {len(prompt_list)}")
-    print(f"Mode: {'Dry run' if args.dry_run else f'AI Provider: {args.ai_provider}'}")
-    print()
+    logger.info(f"=== Prophecy Processing ===")
+    logger.info(f"Stories: {len(story_titles)}")
+    logger.info(f"Prompts: {len(prompt_list)}")
+    logger.info(f"Mode: {'Dry run' if args.dry_run else f'AI Provider: {args.ai_provider}'}")
     
     total_combinations = len(story_titles) * len(prompt_list)
     current_combination = 0
     
     for story_title in story_titles:
         story = stories.get_story(story_title)
-        biblical_text = get_biblical_text(bible, story)
+        biblical_text = get_biblical_text(bible, story, logger)
         
         for prompt_record in prompt_list:
             current_combination += 1
             
-            print(f"--- Combination {current_combination}/{total_combinations} ---")
-            print(f"Story: {story.title} ({story.book})")
-            print(f"Prompt: #{prompt_record['id']} - {prompt_record['prompt']}")
-            print()
+            logger.info(f"--- Combination {current_combination}/{total_combinations} ---")
+            logger.info(f"Story: {story.title} ({story.book})")
+            logger.info(f"Prompt: #{prompt_record['id']} - {prompt_record['prompt']}")
             
-            process_combination(prompts, story, prompt_record, biblical_text, ai_provider, args.dry_run)
+            process_combination(prompts, story, prompt_record, biblical_text, ai_provider, args.dry_run, logger)
     
-    print(f"=== Processing Complete ===")
-    print(f"Processed {current_combination} story-prompt combinations")
+    logger.info(f"=== Processing Complete ===")
+    logger.info(f"Processed {current_combination} story-prompt combinations")
 
 
 def main():
@@ -270,18 +311,21 @@ def main():
     parser = create_argument_parser()
     args = parser.parse_args()
     
+    # Set up logging
+    logger = setup_logging(args.verbosity)
+    
     try:
         setup_environment(args)
-        stories, prompts, bible = initialize_components(args.data)
-        story_titles, prompt_list = validate_inputs(stories, prompts, args)
-        ai_provider = initialize_ai_provider(args)
-        process_all_combinations(stories, prompts, bible, story_titles, prompt_list, ai_provider, args)
+        stories, prompts, bible = initialize_components(args.data, logger)
+        story_titles, prompt_list = validate_inputs(stories, prompts, args, logger)
+        ai_provider = initialize_ai_provider(args, logger)
+        process_all_combinations(stories, prompts, bible, story_titles, prompt_list, ai_provider, args, logger)
     
     except KeyboardInterrupt:
-        print("\nAborted by user", file=sys.stderr)
+        logger.info("Aborted by user")
         sys.exit(130)
     except Exception as e:
-        print(f"Unexpected error: {e}", file=sys.stderr)
+        logger.error(f"Unexpected error: {e}")
         sys.exit(1)
 
 
