@@ -6,10 +6,12 @@ This module provides a CLI for extracting biblical stories and prompts.
 """
 
 import argparse
+import hashlib
 import json
 import logging
 import os
 import sys
+from pathlib import Path
 from typing import List, Dict, Any
 
 # Import modules directly to avoid dependency issues
@@ -122,6 +124,11 @@ def create_argument_parser() -> argparse.ArgumentParser:
         help='Set logging verbosity level (default: INFO)'
     )
     
+    parser.add_argument(
+        '--cache-folder',
+        help='Path to cache folder (defaults to results folder inside data folder)'
+    )
+    
     return parser
 
 
@@ -225,7 +232,58 @@ def get_biblical_text(bible, story, logger: logging.Logger):
         return f"[Biblical text not available for {story.book}]"
 
 
-def process_combination(prompts, story, prompt_record, biblical_text, ai_provider, is_dry_run, logger: logging.Logger):
+def get_cache_folder(data_folder: str, args, logger: logging.Logger) -> Path:
+    """Get the cache folder path, creating it if it doesn't exist."""
+    if args.cache_folder:
+        cache_folder = Path(args.cache_folder)
+    else:
+        # Default to results folder inside data folder
+        cache_folder = Path(data_folder) / "results"
+    
+    # Create cache folder if it doesn't exist
+    try:
+        cache_folder.mkdir(parents=True, exist_ok=True)
+        logger.debug(f"Using cache folder: {cache_folder}")
+        return cache_folder
+    except Exception as e:
+        logger.error(f"Failed to create cache folder {cache_folder}: {e}")
+        sys.exit(1)
+
+
+def calculate_template_checksum(populated_template: str) -> str:
+    """Calculate MD5 checksum of the populated template."""
+    return hashlib.md5(populated_template.encode('utf-8')).hexdigest()
+
+
+def get_cached_result(cache_folder: Path, checksum: str, logger: logging.Logger) -> Dict[str, Any]:
+    """Try to get cached result for the given checksum."""
+    cache_file = cache_folder / f"{checksum}.json"
+    
+    if cache_file.exists():
+        try:
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                cached_result = json.load(f)
+            logger.info(f"Found cached result: {cache_file}")
+            return cached_result
+        except Exception as e:
+            logger.warning(f"Failed to read cache file {cache_file}: {e}")
+    
+    return None
+
+
+def save_cached_result(cache_folder: Path, checksum: str, result: Dict[str, Any], logger: logging.Logger) -> None:
+    """Save result to cache."""
+    cache_file = cache_folder / f"{checksum}.json"
+    
+    try:
+        with open(cache_file, 'w', encoding='utf-8') as f:
+            json.dump(result, f, separators=(',', ':'))
+        logger.debug(f"Saved result to cache: {cache_file}")
+    except Exception as e:
+        logger.warning(f"Failed to save cache file {cache_file}: {e}")
+
+
+def process_combination(prompts, story, prompt_record, biblical_text, ai_provider, is_dry_run, cache_folder, logger: logging.Logger):
     """Process a single story-prompt combination."""
     # Populate template
     try:
@@ -241,40 +299,54 @@ def process_combination(prompts, story, prompt_record, biblical_text, ai_provide
         print("=" * 50)
         print()
     else:
-        # Send to AI provider and get response
-        try:
-            logger.info("Sending to AI provider...")
-            ai_response = ai_provider.post_prompt(
-                populated_template,
-                system_message="You are a biblical scholar analyzing ancient texts."
-            )
-            
-            # Try to parse the AI response as JSON
+        # Calculate checksum for caching
+        checksum = calculate_template_checksum(populated_template)
+        logger.debug(f"Template checksum: {checksum}")
+        
+        # Try to get cached result first
+        cached_result = get_cached_result(cache_folder, checksum, logger)
+        
+        if cached_result is not None:
+            # Use cached result
+            print(json.dumps(cached_result, separators=(',', ':')))
+        else:
+            # Send to AI provider and get response
             try:
-                response_json = json.loads(ai_response)
-                # Add story title and prompt ID to the JSON
-                response_json["story"] = story.title
-                response_json["prompt"] = prompt_record["id"]
+                logger.info("Sending to AI provider...")
+                ai_response = ai_provider.post_prompt(
+                    populated_template,
+                    system_message="You are a biblical scholar analyzing ancient texts."
+                )
                 
-                # Output as flattened JSON line (to stdout for piping)
-                print(json.dumps(response_json, separators=(',', ':')))
+                # Try to parse the AI response as JSON
+                try:
+                    response_json = json.loads(ai_response)
+                    # Add story title and prompt ID to the JSON
+                    response_json["story"] = story.title
+                    response_json["prompt"] = prompt_record["id"]
+                    
+                    # Save to cache
+                    save_cached_result(cache_folder, checksum, response_json, logger)
+                    
+                    # Output as flattened JSON line (to stdout for piping)
+                    print(json.dumps(response_json, separators=(',', ':')))
+                    
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse AI response as JSON: {e}")
+                    logger.debug(f"Raw AI response: {ai_response}")
+                    return False
+                except Exception as e:
+                    logger.error(f"Error processing JSON response: {e}")
+                    return False
                 
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse AI response as JSON: {e}")
-                logger.debug(f"Raw AI response: {ai_response}")
+            except AIProviderError as e:
+                logger.error(f"AI provider failed: {e}")
+                logger.info("Skipping this combination...")
                 return False
             except Exception as e:
-                logger.error(f"Error processing JSON response: {e}")
+                logger.error(f"Unexpected AI error: {e}")
+                logger.info("Skipping this combination...")
                 return False
-            
-        except AIProviderError as e:
-            logger.error(f"AI provider failed: {e}")
-            logger.info("Skipping this combination...")
-            return False
-        except Exception as e:
-            logger.error(f"Unexpected AI error: {e}")
-            logger.info("Skipping this combination...")
-            return False
     
     return True
 
@@ -285,6 +357,12 @@ def process_all_combinations(stories, prompts, bible, story_titles, prompt_list,
     logger.info(f"Stories: {len(story_titles)}")
     logger.info(f"Prompts: {len(prompt_list)}")
     logger.info(f"Mode: {'Dry run' if args.dry_run else f'AI Provider: {args.ai_provider}'}")
+    
+    # Get cache folder (only used when not in dry-run mode)
+    cache_folder = None
+    if not args.dry_run:
+        cache_folder = get_cache_folder(args.data, args, logger)
+        logger.info(f"Cache folder: {cache_folder}")
     
     total_combinations = len(story_titles) * len(prompt_list)
     current_combination = 0
@@ -300,7 +378,7 @@ def process_all_combinations(stories, prompts, bible, story_titles, prompt_list,
             logger.info(f"Story: {story.title} ({story.book})")
             logger.info(f"Prompt: #{prompt_record['id']} - {prompt_record['prompt']}")
             
-            process_combination(prompts, story, prompt_record, biblical_text, ai_provider, args.dry_run, logger)
+            process_combination(prompts, story, prompt_record, biblical_text, ai_provider, args.dry_run, cache_folder, logger)
     
     logger.info(f"=== Processing Complete ===")
     logger.info(f"Processed {current_combination} story-prompt combinations")
