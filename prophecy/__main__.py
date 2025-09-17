@@ -165,10 +165,16 @@ def setup_environment(args) -> None:
 def initialize_components(data_folder: str, logger: logging.Logger):
     """Initialize Stories, Prompts, and Bible components."""
     try:
+        # Resolve the data folder path using the same logic as the individual classes
+        if data_folder is None:
+            resolved_data_folder = os.getenv('PROPHECY_DATA_FOLDER', 'data')
+        else:
+            resolved_data_folder = data_folder
+            
         stories = Stories(data_folder=data_folder)
         prompts = Prompts(data_folder=data_folder)
         bible = Bible(data_folder=data_folder)
-        return stories, prompts, bible
+        return stories, prompts, bible, resolved_data_folder
     except FileNotFoundError as e:
         logger.error(f"{e}")
         logger.error("Please ensure the data folder contains stories.yml, prompts.tsv, and bible data")
@@ -351,7 +357,7 @@ def process_combination(prompts, story, prompt_record, biblical_text, ai_provide
     return True
 
 
-def process_all_combinations(stories, prompts, bible, story_titles, prompt_list, ai_provider, args, logger: logging.Logger):
+def process_all_combinations(stories, prompts, bible, story_titles, prompt_list, ai_provider, args, data_folder, logger: logging.Logger):
     """Process all story-prompt combinations."""
     logger.info(f"=== Prophecy Processing ===")
     logger.info(f"Stories: {len(story_titles)}")
@@ -361,7 +367,7 @@ def process_all_combinations(stories, prompts, bible, story_titles, prompt_list,
     # Get cache folder (only used when not in dry-run mode)
     cache_folder = None
     if not args.dry_run:
-        cache_folder = get_cache_folder(args.data, args, logger)
+        cache_folder = get_cache_folder(data_folder, args, logger)
         logger.info(f"Cache folder: {cache_folder}")
     
     total_combinations = len(story_titles) * len(prompt_list)
@@ -394,10 +400,10 @@ def main():
     
     try:
         setup_environment(args)
-        stories, prompts, bible = initialize_components(args.data, logger)
+        stories, prompts, bible, data_folder = initialize_components(args.data, logger)
         story_titles, prompt_list = validate_inputs(stories, prompts, args, logger)
         ai_provider = initialize_ai_provider(args, logger)
-        process_all_combinations(stories, prompts, bible, story_titles, prompt_list, ai_provider, args, logger)
+        process_all_combinations(stories, prompts, bible, story_titles, prompt_list, ai_provider, args, data_folder, logger)
     
     except KeyboardInterrupt:
         logger.info("Aborted by user")
