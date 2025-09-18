@@ -1,9 +1,5 @@
 # Prophecy Tests
 
-This directory contains pytest tests to validate the structure and content of the prophecy project data files.
-
-# Prophecy Tests
-
 This directory contains comprehensive pytest tests to validate the functionality, structure, and content of the prophecy project.
 
 ## Test Files
@@ -40,6 +36,17 @@ Tests for the Prompts class:
 - Filtering by topic and period
 - Data structure validation
 - Integration with AI providers
+
+#### test_create_sources.py
+Tests for the `scripts/create_sources.py` functionality:
+- **Text cleaning**: Validates removal of special characters and whitespace normalization
+- **Regex validation**: Tests the `RANGE_TOKEN` pattern for valid verse ranges
+- **Bullet parsing**: Tests extraction of book names, verse ranges, and source tags (J/E/P/D)
+- **Range normalization**: Verifies proper space handling, duplicate removal, and format standardization
+- **Bible integration**: Tests that parsed ranges work directly with the Bible class
+- **Format compatibility**: Validates conversion from terse ranges ("1:1-7") to standard format ("1:1-1:7")
+- **Special formatting**: Tests handling of verse suffixes like "4b"
+- **Error handling**: Ensures invalid ranges and malformed input are properly handled
 
 ### Data Integrity Tests
 
@@ -102,13 +109,16 @@ pytest -n auto
 ### Run Specific Test Categories
 ```bash
 # Core API tests
-pytest tests/test_bible.py tests/test_stories.py tests/test_prompts_class.py -v
+pytest tests/test_bible.py tests/test_stories.py tests/test_prompts_class.py tests/test_create_sources.py -v
 
 # Data integrity tests
 pytest tests/test_stories_structure.py tests/test_prompts.py -v
 
 # AI provider tests (requires API keys)
 pytest tests/test_ai_providers.py -v
+
+# Create sources script validation
+pytest tests/test_create_sources.py -v
 ```
 
 ### Run Individual Test Files
@@ -121,6 +131,9 @@ pytest tests/test_stories_structure.py -v
 
 # Prompts data validation
 pytest tests/test_prompts.py -v
+
+# Create sources script tests
+pytest tests/test_create_sources.py -v
 ```
 
 ### Run Specific Test Methods
@@ -137,13 +150,14 @@ pytest tests/test_stories_structure.py::TestStoriesStructure::test_verses_format
 The tests require the following Python packages:
 - **pytest** - Testing framework
 - **pyyaml** - YAML file processing
+- **beautifulsoup4** - HTML parsing (for create_sources tests)
+- **requests** - HTTP requests (for AI provider and create_sources tests)
 - **openai** - AI provider integration (for AI tests)
-- **requests** - HTTP requests (for AI provider tests)
 - **pandas** - Data processing (for prompts tests)
 
 Install all dependencies:
 ```bash
-pip install pytest pyyaml openai requests pandas
+pip install pytest pyyaml beautifulsoup4 requests openai pandas
 # OR use the project environment
 conda env create -f environment.yml
 conda activate prophecy
@@ -169,6 +183,7 @@ addopts = -v --tb=short
 - ✅ Bible JSON data integrity
 - ✅ Cross-reference validation between data files
 - ✅ Verse range format validation
+- ✅ Script output validation (create_sources.py)
 
 ### API Functionality
 - ✅ Bible text extraction with various input formats
@@ -176,12 +191,14 @@ addopts = -v --tb=short
 - ✅ Prompts system functionality
 - ✅ AI provider integration
 - ✅ Error handling and edge cases
+- ✅ Script parsing and range normalization
 
 ### Integration Testing
 - ✅ End-to-end workflows
 - ✅ Data consistency across modules
 - ✅ Environment configuration
 - ✅ File system operations
+- ✅ Scripture source assignment validation
 
 ## Continuous Integration
 
