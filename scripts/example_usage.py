@@ -10,7 +10,8 @@ def load_testament_index(testament_type):
     if testament_type == 'new':
         # New testament index file has been removed
         return {}
-    filename = f"data/{testament_type}_testament.json"
+    # Use index.json for Hebrew Bible books (old_testament.json has been removed)
+    filename = "data/index.json"
     with open(filename, 'r') as f:
         return json.load(f)
 
