@@ -1,0 +1,273 @@
+---
+title: "JSON Files Analysis"
+author: "Your Name"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+## Loading Required Libraries
+
+```{r libraries}
+library(jsonlite)
+library(dplyr)
+library(tidyr)
+library(knitr)
+library(DT)
+library(here)
+```
+
+## Reading JSON Files
+
+```{r read-json-files}
+# Set the path to your folder containing JSON files
+# Change this path to match your folder location
+setwd(here::here())
+
+folder_path <- "data/results"
+
+# Get list of all JSON files in the folder
+json_files <- list.files(folder_path, pattern = "*.json", full.names = TRUE)
+
+cat("Found", length(json_files), "JSON files\n")
+
+# Read all JSON files into a list
+json_data <- lapply(json_files, function(file) {
+  tryCatch({
+    fromJSON(file)
+  }, error = function(e) {
+    cat("Error reading file:", file, "\n")
+    return(NULL)
+  })
+})
+
+# Remove any NULL entries (failed reads)
+json_data <- json_data[!sapply(json_data, is.null)]
+
+cat("Successfully read", length(json_data), "files\n")
+```
+
+## Converting to Data Frame
+
+```{r create-dataframe}
+# Convert list to data frame
+df_raw <- do.call(rbind, lapply(json_data, data.frame, stringsAsFactors = FALSE))
+
+# Check the structure
+str(df_raw)
+head(df_raw)
+```
+
+## Reshaping Data
+
+```{r reshape-data}
+# Simple approach - just get it done
+result_df <- df_raw %>%
+  select(story, prompt, answer) %>%
+  pivot_wider(names_from = prompt, values_from = answer, names_prefix = "prompt_")
+
+# Convert to data frame and set row names
+result_df <- as.data.frame(result_df)
+rownames(result_df) <- result_df$story
+result_df$story <- NULL
+
+# Show the result
+print(result_df)
+```
+
+## Bible Stories Clustering Analysis
+
+```{r clustering-setup}
+# Load required libraries
+library(cluster)
+library(factoextra)
+library(pheatmap)
+library(ggplot2)
+library(dplyr)
+
+# Assuming your data frame is called 'result_df' and contains TRUE/FALSE values
+# Convert to numeric for clustering (TRUE = 1, FALSE = 0)
+
+result_df <- result_df[complete.cases(result_df), ]
+data_numeric <- as.data.frame(lapply(result_df, as.numeric))
+rownames(data_numeric) <- rownames(result_df)
+```
+
+## Method 1: K-means Clustering (Most Common)
+
+```{r kmeans-clustering}
+# Determine optimal number of clusters using elbow method
+set.seed(123)
+wss <- sapply(1:10, function(k){
+  kmeans(data_numeric, centers = k, nstart = 25)$tot.withinss
+})
+
+# Plot elbow curve
+plot(1:10, wss, type = "b", pch = 19, 
+     xlab = "Number of Clusters", ylab = "Within-cluster Sum of Squares",
+     main = "Elbow Method for Optimal k")
+
+# Try k-means with different numbers of clusters
+k <- 4  # Adjust based on elbow plot
+kmeans_result <- kmeans(data_numeric, centers = k, nstart = 25)
+
+# Add cluster assignments to your data
+result_df$cluster <- kmeans_result$cluster
+
+# Show cluster assignments
+print("Cluster assignments:")
+table(kmeans_result$cluster)
+
+# Show stories in each cluster
+for(i in 1:k) {
+  cat("\nCluster", i, "stories:\n")
+  cat(paste(rownames(result_df)[result_df$cluster == i], collapse = ", "), "\n")
+}
+```
+
+## Method 2: Hierarchical Clustering (Better for interpretation)
+
+```{r hierarchical-clustering}
+# Calculate distance matrix using method suitable for binary data
+# Jaccard distance is good for binary data
+dist_matrix <- dist(data_numeric, method = "binary")  # Uses Jaccard distance
+
+# Alternative distance methods for binary data:
+# dist_matrix <- dist(data_numeric, method = "manhattan")  # Manhattan distance
+# dist_matrix <- cluster::daisy(data_numeric, metric = "jaccard")  # Explicit Jaccard
+
+# Perform hierarchical clustering
+hclust_result <- hclust(dist_matrix, method = "ward.D2")
+
+# Plot dendrogram
+plot(hclust_result, main = "Hierarchical Clustering of Bible Stories", 
+     xlab = "", sub = "", cex = 0.8)
+
+# Cut tree to get clusters
+h_clusters <- cutree(hclust_result, k = 4)  # Adjust number of clusters as needed
+
+# Add to dataframe
+result_df$h_cluster <- h_clusters
+
+# Show hierarchical cluster assignments
+for(i in 1:max(h_clusters)) {
+  cat("\nHierarchical Cluster", i, "stories:\n")
+  cat(paste(rownames(result_df)[result_df$h_cluster == i], collapse = ", "), "\n")
+}
+```
+
+## Method 3: PAM Clustering (Robust alternative)
+
+```{r pam-clustering}
+# PAM (Partitioning Around Medoids) is more robust to outliers
+# Good for binary data
+pam_result <- pam(data_numeric, k = 4, metric = "manhattan")
+
+result_df$pam_cluster <- pam_result$clustering
+
+# Show PAM cluster assignments
+for(i in 1:4) {
+  cat("\nPAM Cluster", i, "stories:\n")
+  cat(paste(rownames(result_df)[result_df$pam_cluster == i], collapse = ", "), "\n")
+}
+
+# Show medoids (representative stories for each cluster)
+cat("\nCluster medoids (representative stories):\n")
+print(rownames(data_numeric)[pam_result$medoids])
+```
+
+## Visualization
+
+```{r clustering-visualization}
+# 1. Heatmap showing patterns
+pheatmap(as.matrix(data_numeric), 
+         clustering_distance_rows = "binary",
+         clustering_method = "ward.D2",
+         show_colnames = FALSE,
+         main = "Bible Stories Clustering Heatmap",
+         fontsize_row = 8)
+
+# 2. PCA visualization (even though data is binary, can still be informative)
+pca_result <- prcomp(data_numeric, scale = TRUE)
+pca_data <- data.frame(
+  PC1 = pca_result$x[,1],
+  PC2 = pca_result$x[,2],
+  Story = rownames(data_numeric),
+  Cluster = factor(result_df$h_cluster)
+)
+
+ggplot(pca_data, aes(x = PC1, y = PC2, color = Cluster, label = Story)) +
+  geom_point(size = 3) +
+  geom_text(vjust = -0.5, hjust = 0.5, size = 3) +
+  labs(title = "Bible Stories Clusters (PCA Visualization)",
+       x = paste0("PC1 (", round(summary(pca_result)$importance[2,1] * 100, 1), "% variance)"),
+       y = paste0("PC2 (", round(summary(pca_result)$importance[2,2] * 100, 1), "% variance)")) +
+  theme_minimal()
+```
+
+## Cluster Analysis and Interpretation
+
+```{r cluster-analysis}
+# Analyze what makes each cluster unique
+# Find the most characteristic features for each cluster
+analyze_cluster_features <- function(cluster_num) {
+  cluster_stories <- result_df$h_cluster == cluster_num
+  cluster_data <- data_numeric[cluster_stories, ]
+  
+  # Calculate proportion of TRUE for each feature in this cluster
+  cluster_props <- colMeans(cluster_data)
+  
+  # Calculate proportion of TRUE for each feature overall
+  overall_props <- colMeans(data_numeric)
+  
+  # Find features that are notably higher in this cluster
+  enriched_features <- cluster_props - overall_props
+  
+  # Get top features that characterize this cluster
+  top_features <- names(sort(enriched_features, decreasing = TRUE))[1:10]
+  
+  cat("\nCluster", cluster_num, "- Most characteristic features:\n")
+  for(feature in top_features) {
+    cat(sprintf("%s: %.2f (vs %.2f overall, +%.2f)\n", 
+                feature, 
+                cluster_props[feature], 
+                overall_props[feature], 
+                enriched_features[feature]))
+  }
+}
+
+# Analyze each cluster
+for(i in 1:max(result_df$h_cluster)) {
+  analyze_cluster_features(i)
+}
+```
+
+## Summary and Recommendations
+
+```{r clustering-summary}
+# Compare different clustering methods
+comparison <- data.frame(
+  Story = rownames(result_df),
+  KMeans = result_df$cluster,
+  Hierarchical = result_df$h_cluster,
+  PAM = result_df$pam_cluster
+)
+
+print("Clustering method comparison:")
+print(comparison)
+
+# Calculate silhouette scores to evaluate clustering quality
+sil_kmeans <- silhouette(kmeans_result$cluster, dist_matrix)
+sil_hierarchical <- silhouette(result_df$h_cluster, dist_matrix)
+sil_pam <- silhouette(pam_result$clustering, dist_matrix)
+
+cat("\nClustering quality (average silhouette width):\n")
+cat("K-means:", mean(sil_kmeans[,3]), "\n")
+cat("Hierarchical:", mean(sil_hierarchical[,3]), "\n")
+cat("PAM:", mean(sil_pam[,3]), "\n")
+
+# The method with the highest silhouette score is generally better
+```
