@@ -52,6 +52,29 @@ def clean_text(s: str) -> str:
     s = s.replace("*", "")
     return s
 
+
+def normalize_range_format(range_str: str) -> str:
+    """
+    Normalize range format to standard chapter:verse-chapter:verse format.
+    
+    Examples:
+        '1:1-7' -> '1:1-1:7'  (same chapter)
+        '2:4b-26' -> '2:4b-2:26'  (same chapter with suffix)
+        '1:1-2:7' -> '1:1-2:7'  (cross chapter, already correct)
+    """
+    if '-' not in range_str:
+        # Single verse, no normalization needed
+        return range_str
+        
+    start, end = range_str.split('-', 1)
+    
+    # If end doesn't contain ':', it's a verse in the same chapter as start
+    if ':' not in end:
+        start_chapter = start.split(':')[0]
+        end = f"{start_chapter}:{end}"
+        
+    return f"{start}-{end}"
+
 def parse_bullet(txt: str, source_tag: str):
     """
     Parse a bullet like:
@@ -83,13 +106,15 @@ def parse_bullet(txt: str, source_tag: str):
             if rngs:
                 ranges.extend(rngs)
 
-    # Final cleanup: remove empties/dups while preserving order
+    # Final cleanup: remove empties/dups while preserving order, and normalize format
     seen = set()
     clean_ranges = []
     for r in ranges:
         r = r.strip()
         if not r:
             continue
+        # Normalize to standard format (e.g., "1:1-7" -> "1:1-1:7")
+        r = normalize_range_format(r)
         if r not in seen:
             seen.add(r)
             clean_ranges.append(r)

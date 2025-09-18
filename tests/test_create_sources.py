@@ -82,18 +82,18 @@ class TestCreateSources:
         assert result["ranges"] == ["1:1-2:7"]
         assert result["source"] == "J"
         
-        # Test multiple ranges
+        # Test multiple ranges - should be normalized
         result = parse_bullet("Gen 2:4b-4:26, 4:1-26", "J")
         assert result is not None
         assert result["book"] == "Genesis"
-        assert result["ranges"] == ["2:4b-4:26", "4:1-26"]
+        assert result["ranges"] == ["2:4b-4:26", "4:1-4:26"]  # Second range normalized
         assert result["source"] == "J"
         
         # Test with different books
         result = parse_bullet("Exo 7:1-5, 7:10", "E")
         assert result is not None
         assert result["book"] == "Exodus"
-        assert result["ranges"] == ["7:1-5", "7:10"]
+        assert result["ranges"] == ["7:1-7:5", "7:10"]  # First range normalized
         assert result["source"] == "E"
     
     def test_parse_bullet_invalid(self):
@@ -121,10 +121,10 @@ class TestCreateSources:
         assert result is not None
         assert result["ranges"] == ["1:1-2:7", "3:1-3:24"]
         
-        # Test duplicate removal
+        # Test duplicate removal with normalization
         result = parse_bullet("Gen 1:1-2:7, 1:1-2:7, 3:1-24", "J")
         assert result is not None
-        assert result["ranges"] == ["1:1-2:7", "3:1-24"]
+        assert result["ranges"] == ["1:1-2:7", "3:1-3:24"]  # Second unique range normalized
 
     def test_parse_bullet_with_commentary(self):
         """Test parsing bullets with commentary text."""
@@ -155,6 +155,23 @@ class TestCreateSources:
         for abbrev, full_name in expected_books.items():
             assert BOOK_MAP[abbrev] == full_name
 
+    def test_range_normalization_to_standard_format(self):
+        """Test that ranges are normalized to the standard format expected by Bible class."""
+        # Test that terse ranges are expanded to full format
+        test_cases = [
+            ("Gen 1:1-7", ["1:1-1:7"]),          # Same chapter expanded
+            ("Gen 2:4b-26", ["2:4b-2:26"]),      # Same chapter with suffix
+            ("Gen 1:1-2:7", ["1:1-2:7"]),        # Cross-chapter unchanged
+            ("Gen 3:1", ["3:1"]),                # Single verse unchanged
+            ("Gen 1:1-7, 2:8-25", ["1:1-1:7", "2:8-2:25"]),  # Multiple ranges
+        ]
+        
+        for bullet_text, expected_ranges in test_cases:
+            result = parse_bullet(bullet_text, "J")
+            assert result is not None, f"Failed to parse: {bullet_text}"
+            assert result["ranges"] == expected_ranges, \
+                f"Expected {expected_ranges}, got {result['ranges']} for input: {bullet_text}"
+
 
 class TestCreateSourcesWithBible:
     """Test class for validating create_sources.py output against Bible data."""
@@ -164,61 +181,41 @@ class TestCreateSourcesWithBible:
         """Create a Bible instance for testing."""
         return Bible('data')
     
-    def _convert_range_for_bible(self, range_str):
-        """Convert create_sources range format to Bible class format.
-        
-        create_sources allows: 1:1-31, 1:1-2  
-        Bible class expects: 1:1-1:31, 1:1-1:2
-        """
-        if '-' not in range_str:
-            # Single verse, no conversion needed
-            return range_str
-            
-        start, end = range_str.split('-', 1)
-        
-        # If end doesn't contain ':', it's a verse in the same chapter as start
-        if ':' not in end:
-            start_chapter = start.split(':')[0]
-            end = f"{start_chapter}:{end}"
-            
-        return f"{start}-{end}"
-    
-    def test_range_conversion_for_bible_compatibility(self):
-        """Test the range conversion function."""
+    def test_range_normalization_works_with_create_sources(self):
+        """Test that create_sources now produces ranges in standard format."""
+        # Test that create_sources normalizes terse ranges to standard format
         test_cases = [
-            # (create_sources format, expected Bible format)
-            ("1:1-2:7", "1:1-2:7"),      # Already full format
-            ("1:1-31", "1:1-1:31"),      # Same chapter range
-            ("2:8-25", "2:8-2:25"),      # Same chapter range
-            ("3:1", "3:1"),              # Single verse
-            ("1:1", "1:1"),              # Single verse
+            # Input with terse ranges should be normalized
+            ("Gen 1:1-7", ["1:1-1:7"]),          # Same chapter expanded
+            ("Gen 2:4b-26", ["2:4b-2:26"]),      # Same chapter with suffix  
+            ("Gen 1:1-2:7", ["1:1-2:7"]),        # Cross-chapter unchanged
         ]
         
-        for input_range, expected in test_cases:
-            converted = self._convert_range_for_bible(input_range)
-            assert converted == expected, f"Expected {input_range} -> {expected}, got {converted}"
+        for input_text, expected_ranges in test_cases:
+            result = parse_bullet(input_text, "J")
+            assert result is not None
+            assert result["ranges"] == expected_ranges
 
-    def test_converted_ranges_work_with_bible(self, bible):
-        """Test that converted ranges work with the Bible class."""
-        # Test ranges that create_sources might produce  
+    def test_standard_ranges_work_with_bible(self, bible):
+        """Test that standardized ranges work directly with the Bible class."""
+        # Test ranges in standard format work with Bible class
         test_ranges = [
-            ("Genesis", "1:1-31"),    # Should convert to 1:1-1:31
-            ("Genesis", "2:8-25"),    # Should convert to 2:8-2:25
-            ("Genesis", "1:1-2:7"),   # Already correct format
+            ("Genesis", "1:1-1:31"),   # Standard format, same chapter
+            ("Genesis", "2:8-2:25"),   # Standard format, same chapter
+            ("Genesis", "1:1-2:7"),    # Standard format, cross-chapter
         ]
         
         for book, range_str in test_ranges:
-            converted = self._convert_range_for_bible(range_str)
             try:
-                text = bible.get_text(book, {'range': converted})
+                text = bible.get_text(book, {'range': range_str})
                 assert text is not None
                 assert len(text.strip()) > 0
             except ValueError as e:
-                pytest.fail(f"Converted range {converted} (from {range_str}) should work with Bible class: {e}")
+                pytest.fail(f"Standard range {range_str} should work with Bible class: {e}")
 
-    def test_converted_ranges_work_with_bible(self, bible):
-        """Test that parsed ranges from create_sources can be validated against Bible data."""
-        # Test some sample parsed ranges
+    def test_parsed_ranges_compatible_with_bible_class(self, bible):
+        """Test that parsed ranges from create_sources are directly compatible with Bible class."""
+        # Test some sample parsed ranges - these should now be in standard format
         test_cases = [
             ("Gen", "Genesis", ["1:1-2:7", "2:8-2:25"]),
             ("Exo", "Exodus", ["1:1-1:22", "2:1-2:25"]),
@@ -232,15 +229,13 @@ class TestCreateSourcesWithBible:
                 assert parsed_result is not None
                 assert parsed_result["book"] == book_name
                 
-                # Test that the range exists in the Bible
+                # Test that the range exists in the Bible - no conversion needed!
                 try:
-                    # Convert range to Bible class format
-                    bible_range = self._convert_range_for_bible(range_str)
-                    text = bible.get_text(book_name, {'range': bible_range})
+                    text = bible.get_text(book_name, {'range': range_str})
                     assert text is not None
                     assert len(text.strip()) > 0
                 except ValueError as e:
-                    pytest.fail(f"Range {range_str} (converted to {bible_range}) in {book_name} should be valid in Bible data: {e}")
+                    pytest.fail(f"Range {range_str} in {book_name} should be valid in Bible data: {e}")
 
     def test_all_pentateuch_books_accessible(self, bible):
         """Test that all Pentateuch books referenced in BOOK_MAP are accessible."""
@@ -333,9 +328,8 @@ class TestCreateSourcesWithBible:
                 # Validate that each range can be accessed in the Bible
                 for range_str in entry["ranges"]:
                     try:
-                        # Convert range to Bible class format and try to get text
-                        bible_range = self._convert_range_for_bible(range_str)
-                        text = bible.get_text(entry["book"], {'range': bible_range})
+                        # Ranges should now be in standard format, no conversion needed
+                        text = bible.get_text(entry["book"], {'range': range_str})
                         assert text is not None
                         assert len(text.strip()) > 0
                     except ValueError as e:
@@ -346,11 +340,11 @@ class TestCreateSourcesWithBible:
 
     def test_range_format_compatibility_with_bible_class(self, bible):
         """Test that create_sources range formats are compatible with Bible class expectations."""
-        # Test various range formats that create_sources might produce
+        # Test various range formats that create_sources now produces (all standardized)
         test_ranges = [
             ("Genesis", "1:1-2:7"),    # Standard cross-chapter range
-            ("Genesis", "1:1-1:31"),   # Chapter range to end of chapter  
-            ("Genesis", "2:4-2:25"),   # Within chapter range
+            ("Genesis", "1:1-1:31"),   # Standard same-chapter range  
+            ("Genesis", "2:4-2:25"),   # Standard within-chapter range
         ]
         
         for book, range_str in test_ranges:
@@ -381,21 +375,22 @@ class TestCreateSourcesWithBible:
 
     def test_special_verse_suffixes(self):
         """Test handling of verse suffixes like '4b'."""
-        # Test that suffixes are preserved in parsing
+        # Test that suffixes are preserved in parsing and normalized
         result = parse_bullet("Gen 2:4b-4:26", "J")
         assert result is not None
         assert "2:4b-4:26" in result["ranges"]
         
-        # Test suffix conversion
-        converted = self._convert_range_for_bible("2:4b-26")
-        assert converted == "2:4b-2:26"
+        # Test terse suffix range normalization
+        result = parse_bullet("Gen 2:4b-26", "J")
+        assert result is not None
+        assert "2:4b-2:26" in result["ranges"]  # Should be normalized
         
         # Test multiple suffixes
         result = parse_bullet("Gen 1:1a-3b, 2:4c-5d", "J")
         assert result is not None
-        # Should preserve suffixes in the ranges
-        for r in result["ranges"]:
-            assert re.match(r'\d+:\d+[a-z]?(-\d+(?::\d+)?[a-z]?)?', r)
+        # Should preserve suffixes and normalize format
+        expected_ranges = ["1:1a-1:3b", "2:4c-2:5d"]
+        assert result["ranges"] == expected_ranges
 
     def test_comprehensive_range_validation_workflow(self, bible):
         """Test the complete workflow from create_sources parsing to Bible validation."""
@@ -420,11 +415,8 @@ class TestCreateSourcesWithBible:
             # Validate each range
             for range_str in result["ranges"]:
                 try:
-                    # Convert to Bible format
-                    bible_range = self._convert_range_for_bible(range_str)
-                    
-                    # Try to get text
-                    text = bible.get_text(result["book"], {'range': bible_range})
+                    # Ranges should now be in standard format, no conversion needed
+                    text = bible.get_text(result["book"], {'range': range_str})
                     
                     # Validate we got meaningful content
                     assert text is not None
