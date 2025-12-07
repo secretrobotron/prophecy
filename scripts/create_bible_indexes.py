@@ -58,10 +58,10 @@ def create_bible_indexes():
         else:
             print(f"Warning: File not found for {book_name}: {file_path}")
     
-    # Write Hebrew Bible index
-    with open('data/old_testament.json', 'w') as f:
+    # Write Hebrew Bible index to index.json (replaces old_testament.json)
+    with open('data/index.json', 'w') as f:
         json.dump(hebrew_bible_index, f, indent=2)
-    print(f"Created data/old_testament.json with {len(hebrew_bible_index)} books")
+    print(f"Created data/index.json with {len(hebrew_bible_index)} books")
     
     # Write New Testament index - REMOVED as requested
     # with open('data/new_testament.json', 'w') as f:
