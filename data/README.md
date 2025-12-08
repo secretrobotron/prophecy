@@ -10,6 +10,11 @@ This directory contains the core data files used by the Prophecy project for bib
   - Contains individual JSON files for each biblical book
   - Format: Structured by books, chapters, and verses
   - Example: `Genesis.json`, `Exodus.json`, etc.
+- **`hebrew/`** - Subfolder containing Hebrew Bible in JSON format
+  - Source: [wlc.txt](https://github.com/openscriptures/morphhb/blob/master/oxlos-import/wlc.txt)
+  - Contains individual JSON files for each biblical book
+  - Format: Structured by books, chapters, and verses
+  - Example: `Genesis.json`, `Exodus.json`, etc.
 
 ### Index and Configuration
 - **`index.json`** - Maps biblical book names to their corresponding JSON file paths
