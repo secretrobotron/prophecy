@@ -5,13 +5,8 @@ This directory contains the core data files used by the Prophecy project for bib
 ## Contents
 
 ### Bible Text Data
-- **`bible-kjv/`** - Git submodule containing King James Version Bible in JSON format
-  - Source: [aruljohn/Bible-kjv](https://github.com/aruljohn/Bible-kjv)
-  - Contains individual JSON files for each biblical book
-  - Format: Structured by books, chapters, and verses
-  - Example: `Genesis.json`, `Exodus.json`, etc.
-- **`hebrew/`** - Subfolder containing Hebrew Bible in JSON format
-  - Source: [wlc.txt](https://github.com/openscriptures/morphhb/blob/master/oxlos-import/wlc.txt)
+- **`hebrew/`** - Directory containing Hebrew Masoretic text in JSON format
+  - Source: [Westminster Leningrad Codex](https://github.com/openscriptures/morphhb)
   - Contains individual JSON files for each biblical book
   - Format: Structured by books, chapters, and verses
   - Example: `Genesis.json`, `Exodus.json`, etc.
@@ -20,7 +15,7 @@ This directory contains the core data files used by the Prophecy project for bib
 - **`index.json`** - Maps biblical book names to their corresponding JSON file paths
   - Used by the Python API to locate Bible text files
   - Contains 39 Hebrew Bible books from the Tanakh
-  - Format: `{"BookName": "data/bible-kjv/BookName.json"}`
+  - Format: `{"BookName": "data/hebrew/BookName.json"}`
 
 ### Story Definitions
 - **`stories.yml`** - YAML file defining 72+ major biblical narratives
@@ -83,20 +78,14 @@ These data files are used by:
 
 ## Setup
 
-1. **Initialize the Bible submodule**:
-   ```bash
-   git submodule init
-   git submodule update
-   ```
-
-2. **Verify data integrity**:
+1. **Verify data integrity**:
    ```bash
    python -m pytest tests/test_stories_structure.py tests/test_prompts.py
    ```
 
 ## Data Sources and Attribution
 
-- **Bible Text**: King James Version courtesy of [aruljohn/Bible-kjv](https://github.com/aruljohn/Bible-kjv)
+- **Bible Text**: Hebrew Masoretic text from the Westminster Leningrad Codex via [Open Scriptures Hebrew Bible](https://github.com/openscriptures/morphhb)
 - **Story Boundaries**: Based on traditional biblical scholarship and [biblestories.org](https://biblestories.org/)
 - **Analysis Prompts**: Curated collection for sentiment analysis research
 

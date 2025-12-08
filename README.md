@@ -11,7 +11,7 @@ The Prophecy project bridges the gap between traditional biblical organization (
 - **Story-based Biblical Text Access**: Extract complete biblical narratives spanning multiple chapters
 - **Comprehensive Story Index**: 72+ major Hebrew Bible stories with precise verse ranges
 - **Structured Data Format**: JSON-based Bible text with chapter/verse organization
-- **Book Indexes**: Index of Hebrew Bible books from the KJV translation
+- **Book Indexes**: Index of Hebrew Bible books from the Hebrew Masoretic text
 - **Flexible Text Extraction**: Retrieve stories by name, book, or custom verse ranges
 - **Clean Python API**: Object-oriented modules for easy integration
 - **AI Integration**: Built-in support for OpenAI and other AI providers for text analysis
@@ -23,7 +23,7 @@ The Prophecy project bridges the gap between traditional biblical organization (
 ```
 prophecy/
 ├── data/
-│   ├── bible-kjv/                # KJV Bible JSON files (submodule)
+│   ├── hebrew/                   # Hebrew Masoretic text JSON files
 │   ├── stories.yml               # Story definitions with verse ranges
 │   ├── prompts.tsv               # Sentiment analysis prompts
 │   ├── index.json                # Hebrew Bible book index
@@ -50,7 +50,7 @@ prophecy/
 
 ## Data Sources
 
-- **Bible Text**: King James Version from [aruljohn/Bible-kjv](https://github.com/aruljohn/Bible-kjv)
+- **Bible Text**: Hebrew Masoretic text from [Westminster Leningrad Codex](https://github.com/openscriptures/morphhb)
 - **Story Definitions**: Curated collection of major biblical narratives
 - **Verse Ranges**: Precisely mapped story boundaries using standard biblical citations
 - **Analysis Prompts**: Curated collection of sentiment [prompts](https://docs.google.com/spreadsheets/d/14xjsF39o8T6dVA0DCRL9hz_tPHRQv4rVb8MAeP52GLQ/)
@@ -97,10 +97,6 @@ See `examples/README.md` for detailed documentation of all demonstration scripts
 # Clone the repository
 git clone https://github.com/rvosa/prophecy.git
 cd prophecy
-
-# Initialize Bible data submodule
-git submodule init
-git submodule update
 
 # Install Python dependencies
 pip install pyyaml openai requests pandas
@@ -198,7 +194,6 @@ Contributions welcome! Areas of interest:
 1. **Fork and clone the repository**
 2. **Set up development environment:**
    ```bash
-   git submodule init && git submodule update
    pip install -r requirements.txt  # or use environment.yml
    ```
 3. **Run tests to ensure everything works:**
@@ -218,6 +213,6 @@ MIT License - see LICENSE file for details.
 
 ## Acknowledgments
 
-- Bible text courtesy of [aruljohn/Bible-kjv](https://github.com/aruljohn/Bible-kjv)
+- Bible text from the Westminster Leningrad Codex via [Open Scriptures Hebrew Bible](https://github.com/openscriptures/morphhb)
 - Story boundaries based on traditional biblical scholarship
 - Inspired by narrative approaches to biblical studies

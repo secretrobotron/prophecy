@@ -13,8 +13,6 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        submodules: recursive
     
     - name: Set up Miniconda
       uses: conda-incubator/setup-miniconda@v3

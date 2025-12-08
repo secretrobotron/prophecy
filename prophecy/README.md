@@ -337,7 +337,7 @@ data/
 ├── index.json              # Maps book names to file paths
 ├── stories.yml             # Story definitions with verse ranges  
 ├── prompts.tsv             # Sentiment analysis prompts
-└── bible-kjv/             # Directory containing Bible book files
+└── hebrew/                 # Directory containing Hebrew Masoretic text files
     ├── Genesis.json
     ├── Exodus.json
     └── ...
