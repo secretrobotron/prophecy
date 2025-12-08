@@ -74,13 +74,7 @@ python examples/prompts_usage_demo.py
    conda activate prophecy
    ```
 
-2. **Initialize Bible data:**
-   ```bash
-   git submodule init
-   git submodule update
-   ```
-
-3. **Verify installation:**
+2. **Verify installation:**
    ```bash
    python examples/bible_api_demo.py
    ```
@@ -155,7 +149,7 @@ for i in range(1, 151):  # Psalms 1-150
 
 ### Error Handling
 All examples include robust error handling for common issues:
-- Missing data files or submodule initialization
+- Missing data files
 - Invalid verse references
 - API key configuration problems
 - File permission issues
@@ -174,11 +168,7 @@ done
 ### Common Issues
 
 **"Book file not found" error:**
-```bash
-# Initialize the Bible data submodule
-git submodule init
-git submodule update
-```
+Ensure you have the Hebrew Bible data files in the `data/hebrew/` directory.
 
 **"No module named 'prophecy'" error:**
 ```bash

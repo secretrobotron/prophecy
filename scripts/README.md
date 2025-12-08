@@ -11,7 +11,7 @@ Creates index files for organizing biblical text data by testament.
 - Generates `index.json` index file
 - Maps book names to their corresponding JSON file paths
 - Handles filename normalization (e.g., "Song of Solomon" → "SongofSolomon.json")
-- Validates book availability in the Bible data submodule
+- Note: This script is deprecated as the Hebrew Bible index is now manually maintained
 
 **Usage:**
 ```bash
@@ -22,7 +22,6 @@ python scripts/create_bible_indexes.py
 - `data/index.json` - Index of Hebrew Bible books
 
 **Dependencies:**
-- Requires `data/bible-kjv/Books.json` (from the Bible submodule)
 - Python standard library only
 
 ### 2. `example_usage.py`
@@ -49,13 +48,7 @@ python scripts/example_usage.py
 
 ### Before Running Scripts
 
-1. **Initialize the Bible data submodule:**
-   ```bash
-   git submodule init
-   git submodule update
-   ```
-
-2. **Install Python dependencies:**
+1. **Install Python dependencies:**
    ```bash
    pip install pyyaml
    ```
@@ -81,14 +74,14 @@ python scripts/example_usage.py
 **Function Overview:**
 ```python
 def normalize_book_name_to_filename(book_name):
-    """Convert book name from Books.json to actual JSON filename format."""
+    """Convert book name to actual JSON filename format."""
     
 def create_bible_indexes():
     """Create Hebrew Bible index file."""
 ```
 
 **Process:**
-1. Reads `data/bible-kjv/Books.json` to get official book list
+1. Reads source book list
 2. Separates books into Hebrew Bible and New Testament
 3. Normalizes book names to match actual JSON filenames
 4. Creates index files with path mappings
@@ -97,9 +90,9 @@ def create_bible_indexes():
 **Output Example:**
 ```json
 {
-  "Genesis": "data/bible-kjv/Genesis.json",
-  "Exodus": "data/bible-kjv/Exodus.json",
-  "Leviticus": "data/bible-kjv/Leviticus.json"
+  "Genesis": "data/hebrew/Genesis.json",
+  "Exodus": "data/hebrew/Exodus.json",
+  "Leviticus": "data/hebrew/Leviticus.json"
 }
 ```
 
@@ -158,16 +151,7 @@ if __name__ == "__main__":
 
 **"No such file or directory" errors:**
 - Ensure you're running from the repository root
-- Check that the Bible submodule is initialized: `git submodule status`
 - Verify file paths in error messages
-
-**"Books.json not found":**
-```bash
-# Initialize and update the Bible data submodule
-git submodule init
-git submodule update
-cd data/bible-kjv && ls -la Books.json
-```
 
 **Python import errors:**
 ```bash
@@ -192,23 +176,8 @@ These scripts are typically used in the following scenarios:
 git clone <repository-url>
 cd prophecy
 
-# 2. Initialize submodules
-git submodule init
-git submodule update
-
-# 3. Create indexes
-python scripts/create_bible_indexes.py
-
-# 4. Verify setup
+# 2. Verify setup
 python scripts/example_usage.py
-```
-
-### Data Updates
-When the Bible data submodule is updated:
-```bash
-git submodule update --remote
-python scripts/create_bible_indexes.py  # Regenerate indexes
-python -m pytest tests/  # Verify data integrity
 ```
 
 ### Development Workflow

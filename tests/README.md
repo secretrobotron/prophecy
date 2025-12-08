@@ -219,10 +219,7 @@ pip install -r requirements.txt
 ```
 
 **Missing data files:**
-```bash
-# Initialize Bible submodule
-git submodule init && git submodule update
-```
+Ensure you have the Hebrew Bible data files in the `data/hebrew/` directory.
 
 **AI provider test failures:**
 ```bash
