@@ -1,4 +1,5 @@
 *.rproj
+.idea/
 
 # macOS
 .DS_Store
