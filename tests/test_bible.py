@@ -317,8 +317,8 @@ class TestBibleIntegration:
             
             # Test getting actual text
             text = bible.get_text('Genesis', {'range': '1:1-1:3'})
-            assert 'In the beginning' in text
-            assert 'God created' in text
+            assert 'בְּרֵאשִׁ֖ית' in text
+            assert 'בָּרָ֣א אֱלֹהִ֑ים' in text
             
             # Test book info
             info = bible.get_book_info('Genesis')
@@ -336,7 +336,7 @@ class TestBibleIntegration:
             
             # Test creation story (Genesis 1:1-2:7)
             creation_text = bible.get_text('Genesis', {'range': '1:1-2:7'})
-            assert 'In the beginning' in creation_text
+            assert 'בְּרֵאשִׁ֖ית' in creation_text
             assert len(creation_text) > 100  # Should be substantial text
             
             # Test multiple parts (like complex stories)
