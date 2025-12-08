@@ -185,7 +185,9 @@ def write_json_files(json_books, output_dir):
     os.makedirs(output_dir, exist_ok=True)
     
     for book_abbrev, book_data in json_books.items():
-        output_file = os.path.join(output_dir, f'{book_abbrev}.json')
+        # Use full book name without spaces for filename
+        full_name = book_data['book'].replace(' ', '')
+        output_file = os.path.join(output_dir, f'{full_name}.json')
         
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(book_data, f, ensure_ascii=False, indent=2)
