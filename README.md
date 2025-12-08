@@ -1,4 +1,4 @@
-# 📜 Prophecy: LLM-based sentiment analysis of the TeNaKh
+# 📜 Prophecy: LLM-based content analysis of the TeNaKh
 
 A Python toolkit for analyzing biblical texts, extracting stories, and working with structured biblical data. This project provides programmatic access to the Bible organized by stories rather than just chapters and verses.
 
