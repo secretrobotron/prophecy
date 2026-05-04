@@ -4,18 +4,21 @@ Unit tests for the AI Providers module.
 Tests the abstract base class, ChatGPT implementation, and factory pattern.
 """
 
+import json
 import os
+import subprocess
 from unittest.mock import Mock, patch
 
 import anthropic
 import openai
 import pytest
 
-from prophecy.ai_providers import (
+from prophecy.providers import (
     AIProvider,
     AIProviderError,
     AIProviderFactory,
     ChatGPTProvider,
+    ClaudeCLIProvider,
     ClaudeProvider,
 )
 
@@ -77,7 +80,7 @@ class TestChatGPTProvider:
 
     def test_init_with_api_key(self):
         """Test ChatGPT provider initialization with API key."""
-        with patch("prophecy.ai_providers.OpenAI") as mock_openai:
+        with patch("prophecy.providers.chatgpt.OpenAI") as mock_openai:
             provider = ChatGPTProvider(api_key="test_key")
             assert provider.api_key == "test_key"
             assert provider.model == ChatGPTProvider.DEFAULT_MODEL
@@ -88,7 +91,7 @@ class TestChatGPTProvider:
     def test_init_with_env_var(self):
         """Test ChatGPT provider initialization with environment variable."""
         with patch.dict(os.environ, {"OPENAI_API_KEY": "env_key"}):
-            with patch("prophecy.ai_providers.OpenAI") as mock_openai:
+            with patch("prophecy.providers.chatgpt.OpenAI") as mock_openai:
                 provider = ChatGPTProvider()
                 assert provider.api_key == "env_key"
                 mock_openai.assert_called_once_with(api_key="env_key")
@@ -101,7 +104,7 @@ class TestChatGPTProvider:
 
     def test_init_with_custom_params(self):
         """Test ChatGPT provider initialization with custom parameters."""
-        with patch("prophecy.ai_providers.OpenAI"):
+        with patch("prophecy.providers.chatgpt.OpenAI"):
             provider = ChatGPTProvider(
                 api_key="test_key", model="gpt-4", max_tokens=2000, temperature=0.5
             )
@@ -111,13 +114,15 @@ class TestChatGPTProvider:
 
     def test_init_openai_client_failure(self):
         """Test ChatGPT provider initialization fails when OpenAI client creation fails."""
-        with patch("prophecy.ai_providers.OpenAI", side_effect=Exception("Client creation failed")):
+        with patch(
+            "prophecy.providers.chatgpt.OpenAI", side_effect=Exception("Client creation failed")
+        ):
             with pytest.raises(AIProviderError, match="Failed to initialize OpenAI client"):
                 ChatGPTProvider(api_key="test_key")
 
     def test_post_prompt_success(self):
         """Test successful prompt posting."""
-        with patch("prophecy.ai_providers.OpenAI") as mock_openai:
+        with patch("prophecy.providers.chatgpt.OpenAI") as mock_openai:
             # Setup mock response
             mock_response = Mock()
             mock_response.choices = [Mock()]
@@ -141,7 +146,7 @@ class TestChatGPTProvider:
 
     def test_post_prompt_with_system_message(self):
         """Test prompt posting with system message."""
-        with patch("prophecy.ai_providers.OpenAI") as mock_openai:
+        with patch("prophecy.providers.chatgpt.OpenAI") as mock_openai:
             mock_response = Mock()
             mock_response.choices = [Mock()]
             mock_response.choices[0].message.content = "Response with system context"
@@ -168,7 +173,7 @@ class TestChatGPTProvider:
 
     def test_post_prompt_with_overrides(self):
         """Test prompt posting with parameter overrides."""
-        with patch("prophecy.ai_providers.OpenAI") as mock_openai:
+        with patch("prophecy.providers.chatgpt.OpenAI") as mock_openai:
             mock_response = Mock()
             mock_response.choices = [Mock()]
             mock_response.choices[0].message.content = "Override response"
@@ -192,7 +197,7 @@ class TestChatGPTProvider:
 
     def test_post_prompt_empty_prompt(self):
         """Test that empty prompt raises error."""
-        with patch("prophecy.ai_providers.OpenAI"):
+        with patch("prophecy.providers.chatgpt.OpenAI"):
             provider = ChatGPTProvider(api_key="test_key")
 
             with pytest.raises(AIProviderError, match="Prompt cannot be empty"):
@@ -203,7 +208,7 @@ class TestChatGPTProvider:
 
     def test_post_prompt_authentication_error(self):
         """Test handling of authentication errors."""
-        with patch("prophecy.ai_providers.OpenAI") as mock_openai:
+        with patch("prophecy.providers.chatgpt.OpenAI") as mock_openai:
             mock_client = Mock()
             # Mock the APIError properly
             mock_response = Mock()
@@ -224,7 +229,7 @@ class TestChatGPTProvider:
 
     def test_post_prompt_rate_limit_error(self):
         """Test handling of rate limit errors."""
-        with patch("prophecy.ai_providers.OpenAI") as mock_openai:
+        with patch("prophecy.providers.chatgpt.OpenAI") as mock_openai:
             mock_client = Mock()
             # Mock the RateLimitError properly
             mock_response = Mock()
@@ -245,7 +250,7 @@ class TestChatGPTProvider:
 
     def test_post_prompt_api_error(self):
         """Test handling of general API errors."""
-        with patch("prophecy.ai_providers.OpenAI") as mock_openai:
+        with patch("prophecy.providers.chatgpt.OpenAI") as mock_openai:
             mock_client = Mock()
             # Mock the APIError properly
             mock_request = Mock()
@@ -265,7 +270,7 @@ class TestChatGPTProvider:
 
     def test_post_prompt_unexpected_error(self):
         """Test handling of unexpected errors."""
-        with patch("prophecy.ai_providers.OpenAI") as mock_openai:
+        with patch("prophecy.providers.chatgpt.OpenAI") as mock_openai:
             mock_client = Mock()
             mock_client.chat.completions.create.side_effect = ValueError("Unexpected error")
             mock_openai.return_value = mock_client
@@ -279,27 +284,27 @@ class TestChatGPTProvider:
 
     def test_validate_configuration_valid(self):
         """Test configuration validation with valid parameters."""
-        with patch("prophecy.ai_providers.OpenAI"):
+        with patch("prophecy.providers.chatgpt.OpenAI"):
             provider = ChatGPTProvider(api_key="test_key")
             assert provider.validate_configuration() is True
 
     def test_validate_configuration_no_api_key(self):
         """Test configuration validation fails without API key."""
-        with patch("prophecy.ai_providers.OpenAI"):
+        with patch("prophecy.providers.chatgpt.OpenAI"):
             provider = ChatGPTProvider(api_key="test_key")
             provider.api_key = None
             assert provider.validate_configuration() is False
 
     def test_validate_configuration_no_model(self):
         """Test configuration validation fails without model."""
-        with patch("prophecy.ai_providers.OpenAI"):
+        with patch("prophecy.providers.chatgpt.OpenAI"):
             provider = ChatGPTProvider(api_key="test_key")
             provider.model = None  # pyright: ignore[reportAttributeAccessIssue]
             assert provider.validate_configuration() is False
 
     def test_validate_configuration_invalid_max_tokens(self):
         """Test configuration validation fails with invalid max_tokens."""
-        with patch("prophecy.ai_providers.OpenAI"):
+        with patch("prophecy.providers.chatgpt.OpenAI"):
             provider = ChatGPTProvider(api_key="test_key")
             provider.max_tokens = 0
             assert provider.validate_configuration() is False
@@ -312,7 +317,7 @@ class TestChatGPTProvider:
 
     def test_validate_configuration_invalid_temperature(self):
         """Test configuration validation fails with invalid temperature."""
-        with patch("prophecy.ai_providers.OpenAI"):
+        with patch("prophecy.providers.chatgpt.OpenAI"):
             provider = ChatGPTProvider(api_key="test_key")
             provider.temperature = -0.1
             assert provider.validate_configuration() is False
@@ -325,7 +330,7 @@ class TestChatGPTProvider:
 
     def test_list_available_models_success(self):
         """Test successful model listing."""
-        with patch("prophecy.ai_providers.OpenAI") as mock_openai:
+        with patch("prophecy.providers.chatgpt.OpenAI") as mock_openai:
             # Setup mock models response
             mock_model1 = Mock()
             mock_model1.id = "gpt-3.5-turbo"
@@ -349,7 +354,7 @@ class TestChatGPTProvider:
 
     def test_list_available_models_error(self):
         """Test model listing with API error."""
-        with patch("prophecy.ai_providers.OpenAI") as mock_openai:
+        with patch("prophecy.providers.chatgpt.OpenAI") as mock_openai:
             mock_client = Mock()
             mock_client.models.list.side_effect = Exception("API error")
             mock_openai.return_value = mock_client
@@ -365,7 +370,7 @@ class TestClaudeProvider:
 
     def test_init_with_api_key(self):
         """Test Claude provider initialization with API key."""
-        with patch("prophecy.ai_providers.anthropic.Anthropic") as mock_anthropic:
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic") as mock_anthropic:
             provider = ClaudeProvider(api_key="test_key")
             assert provider.api_key == "test_key"
             assert provider.model == ClaudeProvider.DEFAULT_MODEL
@@ -376,7 +381,7 @@ class TestClaudeProvider:
     def test_init_with_env_var(self):
         """Test Claude provider initialization with environment variable."""
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "env_key"}):
-            with patch("prophecy.ai_providers.anthropic.Anthropic") as mock_anthropic:
+            with patch("prophecy.providers.claude_api.anthropic.Anthropic") as mock_anthropic:
                 provider = ClaudeProvider()
                 assert provider.api_key == "env_key"
                 mock_anthropic.assert_called_once_with(api_key="env_key")
@@ -389,7 +394,7 @@ class TestClaudeProvider:
 
     def test_init_with_custom_params(self):
         """Test Claude provider initialization with custom parameters."""
-        with patch("prophecy.ai_providers.anthropic.Anthropic"):
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic"):
             provider = ClaudeProvider(
                 api_key="test_key", model="claude-3-opus-20240229", max_tokens=2000, temperature=0.5
             )
@@ -400,7 +405,7 @@ class TestClaudeProvider:
     def test_init_anthropic_client_failure(self):
         """Test Claude provider initialization fails when Anthropic client creation fails."""
         with patch(
-            "prophecy.ai_providers.anthropic.Anthropic",
+            "prophecy.providers.claude_api.anthropic.Anthropic",
             side_effect=Exception("Client creation failed"),
         ):
             with pytest.raises(AIProviderError, match="Failed to initialize Anthropic client"):
@@ -408,7 +413,7 @@ class TestClaudeProvider:
 
     def test_post_prompt_success(self):
         """Test successful prompt posting."""
-        with patch("prophecy.ai_providers.anthropic.Anthropic") as mock_anthropic:
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic") as mock_anthropic:
             # Setup mock response
             mock_response = Mock()
             mock_response.content = [Mock()]
@@ -432,7 +437,7 @@ class TestClaudeProvider:
 
     def test_post_prompt_with_system_message(self):
         """Test prompt posting with system message."""
-        with patch("prophecy.ai_providers.anthropic.Anthropic") as mock_anthropic:
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic") as mock_anthropic:
             mock_response = Mock()
             mock_response.content = [Mock()]
             mock_response.content[0].text = "Response with system context"
@@ -456,7 +461,7 @@ class TestClaudeProvider:
 
     def test_post_prompt_with_overrides(self):
         """Test prompt posting with parameter overrides."""
-        with patch("prophecy.ai_providers.anthropic.Anthropic") as mock_anthropic:
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic") as mock_anthropic:
             mock_response = Mock()
             mock_response.content = [Mock()]
             mock_response.content[0].text = "Override response"
@@ -480,7 +485,7 @@ class TestClaudeProvider:
 
     def test_post_prompt_empty_prompt(self):
         """Test that empty prompt raises error."""
-        with patch("prophecy.ai_providers.anthropic.Anthropic"):
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic"):
             provider = ClaudeProvider(api_key="test_key")
 
             with pytest.raises(AIProviderError, match="Prompt cannot be empty"):
@@ -491,7 +496,7 @@ class TestClaudeProvider:
 
     def test_post_prompt_authentication_error(self):
         """Test handling of authentication errors."""
-        with patch("prophecy.ai_providers.anthropic.Anthropic") as mock_anthropic:
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic") as mock_anthropic:
             mock_client = Mock()
             # Mock the authentication error
             auth_error = anthropic.AuthenticationError("Invalid API key", response=Mock(), body={})
@@ -505,7 +510,7 @@ class TestClaudeProvider:
 
     def test_post_prompt_rate_limit_error(self):
         """Test handling of rate limit errors."""
-        with patch("prophecy.ai_providers.anthropic.Anthropic") as mock_anthropic:
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic") as mock_anthropic:
             mock_client = Mock()
             # Mock the rate limit error
             rate_error = anthropic.RateLimitError("Rate limit exceeded", response=Mock(), body={})
@@ -519,7 +524,7 @@ class TestClaudeProvider:
 
     def test_post_prompt_api_error(self):
         """Test handling of general API errors."""
-        with patch("prophecy.ai_providers.anthropic.Anthropic") as mock_anthropic:
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic") as mock_anthropic:
             mock_client = Mock()
             # Mock the API error
             api_error = anthropic.APIError("API error", request=Mock(), body={})
@@ -533,7 +538,7 @@ class TestClaudeProvider:
 
     def test_post_prompt_unexpected_error(self):
         """Test handling of unexpected errors."""
-        with patch("prophecy.ai_providers.anthropic.Anthropic") as mock_anthropic:
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.side_effect = ValueError("Unexpected error")
             mock_anthropic.return_value = mock_client
@@ -545,27 +550,27 @@ class TestClaudeProvider:
 
     def test_validate_configuration_valid(self):
         """Test configuration validation with valid parameters."""
-        with patch("prophecy.ai_providers.anthropic.Anthropic"):
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic"):
             provider = ClaudeProvider(api_key="test_key")
             assert provider.validate_configuration() is True
 
     def test_validate_configuration_no_api_key(self):
         """Test configuration validation fails without API key."""
-        with patch("prophecy.ai_providers.anthropic.Anthropic"):
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic"):
             provider = ClaudeProvider(api_key="test_key")
             provider.api_key = None
             assert provider.validate_configuration() is False
 
     def test_validate_configuration_no_model(self):
         """Test configuration validation fails without model."""
-        with patch("prophecy.ai_providers.anthropic.Anthropic"):
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic"):
             provider = ClaudeProvider(api_key="test_key")
             provider.model = None  # pyright: ignore[reportAttributeAccessIssue]
             assert provider.validate_configuration() is False
 
     def test_validate_configuration_invalid_max_tokens(self):
         """Test configuration validation fails with invalid max_tokens."""
-        with patch("prophecy.ai_providers.anthropic.Anthropic"):
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic"):
             provider = ClaudeProvider(api_key="test_key")
             provider.max_tokens = 0
             assert provider.validate_configuration() is False
@@ -578,7 +583,7 @@ class TestClaudeProvider:
 
     def test_validate_configuration_invalid_temperature(self):
         """Test configuration validation fails with invalid temperature."""
-        with patch("prophecy.ai_providers.anthropic.Anthropic"):
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic"):
             provider = ClaudeProvider(api_key="test_key")
             provider.temperature = -0.1
             assert provider.validate_configuration() is False
@@ -591,7 +596,7 @@ class TestClaudeProvider:
 
     def test_list_available_models_success(self):
         """Test successful model listing."""
-        with patch("prophecy.ai_providers.anthropic.Anthropic") as mock_anthropic:
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic") as mock_anthropic:
             mock_client = Mock()
             mock_anthropic.return_value = mock_client
 
@@ -611,7 +616,7 @@ class TestClaudeProvider:
 
     def test_get_provider_name(self):
         """Test getting provider name."""
-        with patch("prophecy.ai_providers.anthropic.Anthropic"):
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic"):
             provider = ClaudeProvider(api_key="test_key")
             assert provider.get_provider_name() == "ClaudeProvider"
 
@@ -621,33 +626,33 @@ class TestAIProviderFactory:
 
     def test_create_claude_provider(self):
         """Test creating Claude provider through factory."""
-        with patch("prophecy.ai_providers.anthropic.Anthropic"):
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic"):
             provider = AIProviderFactory.create_provider("claude", api_key="test_key")
             assert isinstance(provider, ClaudeProvider)
             assert provider.api_key == "test_key"
 
     def test_create_anthropic_provider_alias(self):
         """Test creating provider using 'anthropic' alias."""
-        with patch("prophecy.ai_providers.anthropic.Anthropic"):
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic"):
             provider = AIProviderFactory.create_provider("anthropic", api_key="test_key")
             assert isinstance(provider, ClaudeProvider)
 
     def test_create_chatgpt_provider(self):
         """Test creating ChatGPT provider through factory."""
-        with patch("prophecy.ai_providers.OpenAI"):
+        with patch("prophecy.providers.chatgpt.OpenAI"):
             provider = AIProviderFactory.create_provider("chatgpt", api_key="test_key")
             assert isinstance(provider, ChatGPTProvider)
             assert provider.api_key == "test_key"
 
     def test_create_openai_provider_alias(self):
         """Test creating provider using 'openai' alias."""
-        with patch("prophecy.ai_providers.OpenAI"):
+        with patch("prophecy.providers.chatgpt.OpenAI"):
             provider = AIProviderFactory.create_provider("openai", api_key="test_key")
             assert isinstance(provider, ChatGPTProvider)
 
     def test_create_provider_case_insensitive(self):
         """Test that provider creation is case insensitive."""
-        with patch("prophecy.ai_providers.OpenAI"):
+        with patch("prophecy.providers.chatgpt.OpenAI"):
             provider = AIProviderFactory.create_provider("CHATGPT", api_key="test_key")
             assert isinstance(provider, ChatGPTProvider)
 
@@ -658,7 +663,7 @@ class TestAIProviderFactory:
 
     def test_create_provider_initialization_failure(self):
         """Test that provider initialization failure is handled."""
-        with patch("prophecy.ai_providers.OpenAI", side_effect=Exception("Init failed")):
+        with patch("prophecy.providers.chatgpt.OpenAI", side_effect=Exception("Init failed")):
             with pytest.raises(AIProviderError, match="Failed to create chatgpt provider"):
                 AIProviderFactory.create_provider("chatgpt", api_key="test_key")
 
@@ -717,7 +722,7 @@ class TestIntegration:
 
     def test_end_to_end_workflow(self):
         """Test complete workflow from factory to response."""
-        with patch("prophecy.ai_providers.OpenAI") as mock_openai:
+        with patch("prophecy.providers.chatgpt.OpenAI") as mock_openai:
             # Setup mock response
             mock_response = Mock()
             mock_response.choices = [Mock()]
@@ -749,11 +754,11 @@ class TestIntegration:
         mock_provider = MockAIProvider(api_key="test")
 
         # ChatGPT provider (mocked)
-        with patch("prophecy.ai_providers.OpenAI"):
+        with patch("prophecy.providers.chatgpt.OpenAI"):
             chatgpt_provider = ChatGPTProvider(api_key="test")
 
         # Claude provider (mocked)
-        with patch("prophecy.ai_providers.anthropic.Anthropic"):
+        with patch("prophecy.providers.claude_api.anthropic.Anthropic"):
             claude_provider = ClaudeProvider(api_key="test")
 
         # All should implement the same interface
@@ -764,3 +769,173 @@ class TestIntegration:
             assert callable(provider.post_prompt)
             assert callable(provider.validate_configuration)
             assert callable(provider.get_provider_name)
+
+
+def _cli_envelope(text: str = "hello", is_error: bool = False) -> str:
+    """Build a stdout payload that mimics `claude --print --output-format json`."""
+    return json.dumps(
+        {
+            "type": "result",
+            "subtype": "success",
+            "is_error": is_error,
+            "result": text,
+        }
+    )
+
+
+class TestClaudeCLIProvider:
+    """Tests for the local-Claude subprocess provider."""
+
+    def test_init_defaults(self):
+        provider = ClaudeCLIProvider()
+        assert provider.model == ClaudeCLIProvider.DEFAULT_MODEL
+        assert provider.binary == ClaudeCLIProvider.DEFAULT_BINARY
+        assert provider.timeout == ClaudeCLIProvider.DEFAULT_TIMEOUT
+        assert provider.api_key is None
+
+    def test_init_overrides(self):
+        provider = ClaudeCLIProvider(model="opus", binary="/usr/local/bin/claude", timeout=10)
+        assert provider.model == "opus"
+        assert provider.binary == "/usr/local/bin/claude"
+        assert provider.timeout == 10
+
+    def test_post_prompt_returns_result_field(self):
+        provider = ClaudeCLIProvider()
+        completed = Mock(returncode=0, stdout=_cli_envelope("Generated text"), stderr="")
+        with (
+            patch("prophecy.providers.claude_cli.shutil.which", return_value="/bin/claude"),
+            patch("prophecy.providers.claude_cli.subprocess.run", return_value=completed) as run,
+        ):
+            response = provider.post_prompt("Tell me a story", system_message="be terse")
+
+        assert response == "Generated text"
+        # Verify the command shape
+        cmd = run.call_args.args[0]
+        assert cmd[0] == "/bin/claude"
+        assert "--print" in cmd
+        assert "--output-format" in cmd and "json" in cmd
+        assert "--system-prompt" in cmd
+        # Prompt is delivered via stdin, not argv
+        assert run.call_args.kwargs["input"] == "Tell me a story"
+
+    def test_post_prompt_no_system_message_omits_flag(self):
+        provider = ClaudeCLIProvider()
+        completed = Mock(returncode=0, stdout=_cli_envelope("ok"), stderr="")
+        with (
+            patch("prophecy.providers.claude_cli.shutil.which", return_value="/bin/claude"),
+            patch("prophecy.providers.claude_cli.subprocess.run", return_value=completed) as run,
+        ):
+            provider.post_prompt("hi")
+        assert "--system-prompt" not in run.call_args.args[0]
+
+    def test_post_prompt_empty_raises(self):
+        provider = ClaudeCLIProvider()
+        with pytest.raises(AIProviderError, match="Prompt cannot be empty"):
+            provider.post_prompt("   ")
+
+    def test_post_prompt_binary_missing_raises(self):
+        provider = ClaudeCLIProvider()
+        with patch("prophecy.providers.claude_cli.shutil.which", return_value=None):
+            with pytest.raises(AIProviderError, match="not found on PATH"):
+                provider.post_prompt("hi")
+
+    def test_post_prompt_nonzero_exit_raises(self):
+        provider = ClaudeCLIProvider()
+        completed = Mock(returncode=2, stdout="", stderr="bad flag")
+        with (
+            patch("prophecy.providers.claude_cli.shutil.which", return_value="/bin/claude"),
+            patch("prophecy.providers.claude_cli.subprocess.run", return_value=completed),
+        ):
+            with pytest.raises(AIProviderError, match="exited with code 2"):
+                provider.post_prompt("hi")
+
+    def test_post_prompt_timeout_raises(self):
+        provider = ClaudeCLIProvider(timeout=1)
+        with (
+            patch("prophecy.providers.claude_cli.shutil.which", return_value="/bin/claude"),
+            patch(
+                "prophecy.providers.claude_cli.subprocess.run",
+                side_effect=subprocess.TimeoutExpired(cmd="claude", timeout=1),
+            ),
+        ):
+            with pytest.raises(AIProviderError, match="timed out"):
+                provider.post_prompt("hi")
+
+    def test_post_prompt_malformed_json_raises(self):
+        provider = ClaudeCLIProvider()
+        completed = Mock(returncode=0, stdout="not-json{", stderr="")
+        with (
+            patch("prophecy.providers.claude_cli.shutil.which", return_value="/bin/claude"),
+            patch("prophecy.providers.claude_cli.subprocess.run", return_value=completed),
+        ):
+            with pytest.raises(AIProviderError, match="Could not parse"):
+                provider.post_prompt("hi")
+
+    def test_post_prompt_envelope_is_error(self):
+        provider = ClaudeCLIProvider()
+        completed = Mock(
+            returncode=0,
+            stdout=_cli_envelope("rate limited", is_error=True),
+            stderr="",
+        )
+        with (
+            patch("prophecy.providers.claude_cli.shutil.which", return_value="/bin/claude"),
+            patch("prophecy.providers.claude_cli.subprocess.run", return_value=completed),
+        ):
+            with pytest.raises(AIProviderError, match="reported an error"):
+                provider.post_prompt("hi")
+
+    def test_post_prompt_envelope_missing_result(self):
+        provider = ClaudeCLIProvider()
+        completed = Mock(returncode=0, stdout=json.dumps({"is_error": False}), stderr="")
+        with (
+            patch("prophecy.providers.claude_cli.shutil.which", return_value="/bin/claude"),
+            patch("prophecy.providers.claude_cli.subprocess.run", return_value=completed),
+        ):
+            with pytest.raises(AIProviderError, match="missing string 'result'"):
+                provider.post_prompt("hi")
+
+    def test_validate_configuration_true_when_binary_present(self):
+        provider = ClaudeCLIProvider()
+        with patch("prophecy.providers.claude_cli.shutil.which", return_value="/bin/claude"):
+            assert provider.validate_configuration() is True
+
+    def test_validate_configuration_false_when_binary_missing(self):
+        provider = ClaudeCLIProvider()
+        with patch("prophecy.providers.claude_cli.shutil.which", return_value=None):
+            assert provider.validate_configuration() is False
+
+    def test_factory_creates_claude_cli(self):
+        provider = AIProviderFactory.create_provider("claude-cli")
+        assert isinstance(provider, ClaudeCLIProvider)
+
+    def test_factory_creates_local_claude_alias(self):
+        provider = AIProviderFactory.create_provider("local-claude")
+        assert isinstance(provider, ClaudeCLIProvider)
+
+    def test_factory_listing_includes_cli_provider(self):
+        names = AIProviderFactory.get_available_providers()
+        assert "claude-cli" in names
+        assert "local-claude" in names
+
+    def test_post_prompt_strips_json_code_fence(self):
+        provider = ClaudeCLIProvider()
+        fenced = '```json\n{"answer":true,"reason":"x","certainty":100}\n```'
+        completed = Mock(returncode=0, stdout=_cli_envelope(fenced), stderr="")
+        with (
+            patch("prophecy.providers.claude_cli.shutil.which", return_value="/bin/claude"),
+            patch("prophecy.providers.claude_cli.subprocess.run", return_value=completed),
+        ):
+            response = provider.post_prompt("hi")
+        assert response == '{"answer":true,"reason":"x","certainty":100}'
+
+    def test_post_prompt_leaves_unfenced_text_alone(self):
+        provider = ClaudeCLIProvider()
+        plain = "Just a plain answer with no fences."
+        completed = Mock(returncode=0, stdout=_cli_envelope(plain), stderr="")
+        with (
+            patch("prophecy.providers.claude_cli.shutil.which", return_value="/bin/claude"),
+            patch("prophecy.providers.claude_cli.subprocess.run", return_value=completed),
+        ):
+            response = provider.post_prompt("hi")
+        assert response == plain

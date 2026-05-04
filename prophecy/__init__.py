@@ -17,16 +17,24 @@ __all__ = ["Bible", "Prompts", "Settings", "Stories", "Story"]
 # The names are re-exported via __all__ — `noqa: F401` quiets ruff's
 # unused-import check, which doesn't see the conditional __all__.extend.
 try:
-    from .ai_providers import (
+    from .providers import (
         AIProvider,  # noqa: F401
         AIProviderError,  # noqa: F401
         AIProviderFactory,  # noqa: F401
         ChatGPTProvider,  # noqa: F401
+        ClaudeCLIProvider,  # noqa: F401
         ClaudeProvider,  # noqa: F401
     )
 
     __all__.extend(
-        ["AIProvider", "ChatGPTProvider", "ClaudeProvider", "AIProviderFactory", "AIProviderError"]
+        [
+            "AIProvider",
+            "AIProviderError",
+            "AIProviderFactory",
+            "ChatGPTProvider",
+            "ClaudeCLIProvider",
+            "ClaudeProvider",
+        ]
     )
 except ImportError:
     # AI providers not available (missing openai/anthropic dependency)

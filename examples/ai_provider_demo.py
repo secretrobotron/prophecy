@@ -154,7 +154,7 @@ def demonstrate_extensibility():
     print("\n=== Extensibility Example ===\n")
 
     # Show how to register a custom provider
-    from prophecy.ai_providers import AIProvider
+    from prophecy.providers import AIProvider
 
     class MockAIProvider(AIProvider):
         """Example custom AI provider."""
