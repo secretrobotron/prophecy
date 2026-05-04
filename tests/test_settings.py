@@ -70,8 +70,7 @@ class TestSettingsLoad:
     def test_unknown_toml_keys_are_ignored(self, tmp_path):
         toml_path = tmp_path / "prophecy.toml"
         toml_path.write_text(
-            'data_folder = "/srv/data"\nunknown_key = "ignored"\n'
-            "[some_other_section]\nfoo = 1\n"
+            'data_folder = "/srv/data"\nunknown_key = "ignored"\n[some_other_section]\nfoo = 1\n'
         )
         with patch.dict(os.environ, {}, clear=True):
             s = Settings.load(config_path=toml_path)
