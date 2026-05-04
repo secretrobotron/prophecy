@@ -6,10 +6,11 @@ templates using the Template system.
 """
 
 import csv
-import os
 import textwrap
 from pathlib import Path
 from string import Template
+
+from .settings import Settings
 
 
 class Prompts:
@@ -20,17 +21,18 @@ class Prompts:
     for reading prompts and populating templates with prompts and Story objects.
     """
 
-    def __init__(self, data_folder: str | None = None):
+    def __init__(self, data_folder: str | Path | None = None):
         """
         Initialize the Prompts class.
 
         Args:
-            data_folder: Path to the data folder containing prompts.tsv and template.txt.
-                        If None, uses the PROPHECY_DATA_FOLDER environment variable.
-                        If that's not set, defaults to 'data' relative to the current directory.
+            data_folder: Path to the data folder containing prompts.tsv and
+                template.txt. If None, falls back to ``Settings.load()``,
+                which layers prophecy.toml, the PROPHECY_DATA_FOLDER env
+                var, and the dataclass default ('data').
         """
         if data_folder is None:
-            data_folder = os.getenv("PROPHECY_DATA_FOLDER", "data")
+            data_folder = Settings.load().data_folder
 
         self.data_folder = Path(data_folder)
 

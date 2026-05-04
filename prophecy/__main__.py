@@ -16,8 +16,7 @@ from typing import Any
 
 from .bible import Bible
 from .prompts import Prompts
-
-# Import modules directly to avoid dependency issues
+from .settings import Settings
 from .stories import Stories
 
 # Try to import AI providers (optional if openai not available)
@@ -153,28 +152,13 @@ def setup_logging(verbosity_level: str) -> logging.Logger:
     return logger
 
 
-def setup_environment(args) -> None:
-    """Set up environment variables from command line arguments."""
-    if args.data:
-        os.environ["PROPHECY_DATA_FOLDER"] = args.data
-
-    if args.api_key:
-        os.environ["OPENAI_API_KEY"] = args.api_key
-
-
-def initialize_components(data_folder: str | None, logger: logging.Logger):
-    """Initialize Stories, Prompts, and Bible components."""
+def initialize_components(settings: Settings, logger: logging.Logger):
+    """Initialize Stories, Prompts, and Bible components from a Settings."""
     try:
-        # Resolve the data folder path using the same logic as the individual classes
-        if data_folder is None:
-            resolved_data_folder = os.getenv("PROPHECY_DATA_FOLDER", "data")
-        else:
-            resolved_data_folder = data_folder
-
-        stories = Stories(data_folder=data_folder)
-        prompts = Prompts(data_folder=data_folder)
-        bible = Bible(data_folder=data_folder)
-        return stories, prompts, bible, resolved_data_folder
+        stories = Stories(data_folder=settings.data_folder)
+        prompts = Prompts(data_folder=settings.data_folder)
+        bible = Bible(data_folder=settings.data_folder)
+        return stories, prompts, bible
     except FileNotFoundError as e:
         logger.error(f"{e}")
         logger.error(
@@ -239,15 +223,9 @@ def get_biblical_text(bible, story, logger: logging.Logger):
         return f"[Biblical text not available for {story.book}]"
 
 
-def get_cache_folder(data_folder: str, args, logger: logging.Logger) -> Path:
-    """Get the cache folder path, creating it if it doesn't exist."""
-    if args.cache_folder:
-        cache_folder = Path(args.cache_folder)
-    else:
-        # Default to results folder inside data folder
-        cache_folder = Path(data_folder) / "results"
-
-    # Create cache folder if it doesn't exist
+def get_cache_folder(settings: Settings, logger: logging.Logger) -> Path:
+    """Resolve the cache folder from settings, creating it if needed."""
+    cache_folder = settings.resolve_cache_folder()
     try:
         cache_folder.mkdir(parents=True, exist_ok=True)
         logger.debug(f"Using cache folder: {cache_folder}")
@@ -379,7 +357,7 @@ def process_all_combinations(
     prompt_list,
     ai_provider,
     args,
-    data_folder,
+    settings: Settings,
     logger: logging.Logger,
 ):
     """Process all story-prompt combinations."""
@@ -391,7 +369,7 @@ def process_all_combinations(
     # Get cache folder (only used when not in dry-run mode)
     cache_folder = None
     if not args.dry_run:
-        cache_folder = get_cache_folder(data_folder, args, logger)
+        cache_folder = get_cache_folder(settings, logger)
         logger.info(f"Cache folder: {cache_folder}")
 
     total_combinations = len(story_titles) * len(prompt_list)
@@ -432,8 +410,11 @@ def main():
     logger = setup_logging(args.verbosity)
 
     try:
-        setup_environment(args)
-        stories, prompts, bible, data_folder = initialize_components(args.data, logger)
+        # Build a Settings once from CLI flags + env + ./prophecy.toml,
+        # then thread it through the pipeline.
+        settings = Settings.load(data_folder=args.data, cache_folder=args.cache_folder)
+
+        stories, prompts, bible = initialize_components(settings, logger)
         story_titles, prompt_list = validate_inputs(stories, prompts, args, logger)
         ai_provider = initialize_ai_provider(args, logger)
         process_all_combinations(
@@ -444,7 +425,7 @@ def main():
             prompt_list,
             ai_provider,
             args,
-            data_folder,
+            settings,
             logger,
         )
 

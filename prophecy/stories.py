@@ -4,10 +4,11 @@ Stories class for the Prophecy project.
 This module provides the Stories class for accessing biblical stories from the stories.yml data.
 """
 
-import os
 from pathlib import Path
 
 import yaml
+
+from .settings import Settings
 
 
 class Stories:
@@ -18,17 +19,18 @@ class Stories:
     for extracting story information including title, book, and verse ranges.
     """
 
-    def __init__(self, data_folder: str | None = None):
+    def __init__(self, data_folder: str | Path | None = None):
         """
         Initialize the Stories class.
 
         Args:
             data_folder: Path to the data folder containing stories.yml.
-                        If None, uses the PROPHECY_DATA_FOLDER environment variable.
-                        If that's not set, defaults to 'data' relative to the current directory.
+                If None, falls back to ``Settings.load()``, which layers
+                prophecy.toml, the PROPHECY_DATA_FOLDER env var, and the
+                dataclass default ('data').
         """
         if data_folder is None:
-            data_folder = os.getenv("PROPHECY_DATA_FOLDER", "data")
+            data_folder = Settings.load().data_folder
 
         self.data_folder = Path(data_folder)
 

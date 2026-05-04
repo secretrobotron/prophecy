@@ -7,10 +7,11 @@ rather than just chapters and verses.
 
 from .bible import Bible
 from .prompts import Prompts
+from .settings import Settings
 from .stories import Stories, Story
 
 __version__ = "0.1.0"
-__all__ = ["Bible", "Stories", "Story", "Prompts"]
+__all__ = ["Bible", "Prompts", "Settings", "Stories", "Story"]
 
 # Conditionally import AI providers (requires openai/anthropic dependency).
 # The names are re-exported via __all__ — `noqa: F401` quiets ruff's

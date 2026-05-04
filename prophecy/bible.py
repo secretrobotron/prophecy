@@ -5,10 +5,11 @@ This module provides the Bible class for accessing biblical texts from the KJV d
 """
 
 import json
-import os
 import re
 from collections.abc import Mapping
 from pathlib import Path
+
+from .settings import Settings
 
 
 class Bible:
@@ -19,17 +20,18 @@ class Bible:
     for extracting text based on book titles and verse ranges.
     """
 
-    def __init__(self, data_folder: str | None = None):
+    def __init__(self, data_folder: str | Path | None = None):
         """
         Initialize the Bible class.
 
         Args:
-            data_folder: Path to the data folder containing index.json and bible files.
-                        If None, uses the PROPHECY_DATA_FOLDER environment variable.
-                        If that's not set, defaults to 'data' relative to the current directory.
+            data_folder: Path to the data folder containing index.json and
+                bible files. If None, falls back to ``Settings.load()``,
+                which layers prophecy.toml, the PROPHECY_DATA_FOLDER env
+                var, and the dataclass default ('data').
         """
         if data_folder is None:
-            data_folder = os.getenv("PROPHECY_DATA_FOLDER", "data")
+            data_folder = Settings.load().data_folder
 
         self.data_folder = Path(data_folder)
 

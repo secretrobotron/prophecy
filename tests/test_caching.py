@@ -8,7 +8,6 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock
 
 # Add the prophecy module to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -19,6 +18,7 @@ from prophecy.__main__ import (
     get_cached_result,
     save_cached_result,
 )
+from prophecy.settings import Settings
 
 
 class TestCaching:
@@ -100,15 +100,13 @@ class TestCaching:
             assert result is None
 
     def test_get_cache_folder_default(self):
-        """Test default cache folder creation."""
+        """Test default cache folder creation (data_folder/results)."""
         logger = logging.getLogger("test")
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Mock args without cache_folder
-            args = Mock()
-            args.cache_folder = None
+            settings = Settings(data_folder=Path(temp_dir))
 
-            cache_folder = get_cache_folder(temp_dir, args, logger)
+            cache_folder = get_cache_folder(settings, logger)
             expected_path = Path(temp_dir) / "results"
 
             assert cache_folder == expected_path
@@ -120,12 +118,12 @@ class TestCaching:
 
         with tempfile.TemporaryDirectory() as temp_dir:
             custom_cache = Path(temp_dir) / "custom_cache"
+            settings = Settings(
+                data_folder=Path("/some/data/folder"),
+                cache_folder=custom_cache,
+            )
 
-            # Mock args with custom cache_folder
-            args = Mock()
-            args.cache_folder = str(custom_cache)
-
-            cache_folder = get_cache_folder("/some/data/folder", args, logger)
+            cache_folder = get_cache_folder(settings, logger)
 
             assert cache_folder == custom_cache
             assert cache_folder.exists()
