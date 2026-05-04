@@ -1,0 +1,74 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "prophecy"
+version = "0.1.0"
+description = "LLM-based content analysis of the TeNaKh."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+authors = [
+    { name = "Rutger Vos" },
+]
+dependencies = [
+    "anthropic>=0.20",
+    "openai>=1.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Extra deps used by helper scripts (e.g. the Wikiversity scraper in
+# scripts/create_sources.py). Not required for the core library.
+scripts = [
+    "beautifulsoup4>=4.12",
+    "requests>=2.30",
+]
+# Everything needed to run the test suite, lints, and type checks. The
+# `scripts` extra is included so test_create_sources.py can run.
+dev = [
+    "prophecy[scripts]",
+    "pyright>=1.1.380",
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "pytest-mock>=3.10",
+    "ruff>=0.6",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["prophecy"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [".venv", "data"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long — `ruff format` handles wrapping where it can
+]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pyright]
+include = ["prophecy", "tests", "examples", "scripts"]
+exclude = ["**/__pycache__", ".venv", "**/.venv", "data"]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
