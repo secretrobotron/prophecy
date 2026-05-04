@@ -70,7 +70,8 @@ def main():
     if "Psalms" in hebrew_bible:
         print(f"Psalms found in Hebrew Bible: {hebrew_bible['Psalms']}")
         psalms_data = get_book_data("Psalms", hebrew_bible)
-        print(f"Psalms has {len(psalms_data['chapters'])} chapters")
+        if psalms_data:
+            print(f"Psalms has {len(psalms_data['chapters'])} chapters")
 
 
 if __name__ == "__main__":

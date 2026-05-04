@@ -69,7 +69,7 @@ class TestAIProvider:
     def test_cannot_instantiate_abstract_class(self):
         """Test that AIProvider cannot be instantiated directly."""
         with pytest.raises(TypeError):
-            AIProvider()
+            AIProvider()  # pyright: ignore[reportAbstractUsage]
 
 
 class TestChatGPTProvider:
@@ -294,7 +294,7 @@ class TestChatGPTProvider:
         """Test configuration validation fails without model."""
         with patch("prophecy.ai_providers.OpenAI"):
             provider = ChatGPTProvider(api_key="test_key")
-            provider.model = None
+            provider.model = None  # pyright: ignore[reportAttributeAccessIssue]
             assert provider.validate_configuration() is False
 
     def test_validate_configuration_invalid_max_tokens(self):
@@ -307,7 +307,7 @@ class TestChatGPTProvider:
             provider.max_tokens = -1
             assert provider.validate_configuration() is False
 
-            provider.max_tokens = "invalid"
+            provider.max_tokens = "invalid"  # pyright: ignore[reportAttributeAccessIssue]
             assert provider.validate_configuration() is False
 
     def test_validate_configuration_invalid_temperature(self):
@@ -320,7 +320,7 @@ class TestChatGPTProvider:
             provider.temperature = 2.1
             assert provider.validate_configuration() is False
 
-            provider.temperature = "invalid"
+            provider.temperature = "invalid"  # pyright: ignore[reportAttributeAccessIssue]
             assert provider.validate_configuration() is False
 
     def test_list_available_models_success(self):
@@ -560,7 +560,7 @@ class TestClaudeProvider:
         """Test configuration validation fails without model."""
         with patch("prophecy.ai_providers.anthropic.Anthropic"):
             provider = ClaudeProvider(api_key="test_key")
-            provider.model = None
+            provider.model = None  # pyright: ignore[reportAttributeAccessIssue]
             assert provider.validate_configuration() is False
 
     def test_validate_configuration_invalid_max_tokens(self):
@@ -573,7 +573,7 @@ class TestClaudeProvider:
             provider.max_tokens = -1
             assert provider.validate_configuration() is False
 
-            provider.max_tokens = "invalid"
+            provider.max_tokens = "invalid"  # pyright: ignore[reportAttributeAccessIssue]
             assert provider.validate_configuration() is False
 
     def test_validate_configuration_invalid_temperature(self):
@@ -586,7 +586,7 @@ class TestClaudeProvider:
             provider.temperature = 1.1
             assert provider.validate_configuration() is False
 
-            provider.temperature = "invalid"
+            provider.temperature = "invalid"  # pyright: ignore[reportAttributeAccessIssue]
             assert provider.validate_configuration() is False
 
     def test_list_available_models_success(self):

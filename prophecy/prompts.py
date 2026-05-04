@@ -74,12 +74,13 @@ class Prompts:
         """
         return [prompt.copy() for prompt in self._prompts_data]
 
-    def get_prompt_by_id(self, prompt_id: str) -> dict[str, str]:
+    def get_prompt_by_id(self, prompt_id: str | int) -> dict[str, str]:
         """
         Get a specific prompt by its ID.
 
         Args:
-            prompt_id: The ID of the prompt to retrieve
+            prompt_id: The ID of the prompt to retrieve. Accepts ``str`` or
+                ``int`` — int values are stringified before lookup.
 
         Returns:
             Dictionary containing 'id', 'period', 'topic', 'prompt' keys

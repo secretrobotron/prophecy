@@ -260,7 +260,7 @@ class TestBible:
 
         # Test non-dict part
         with pytest.raises(ValueError, match="Each part must be a dictionary"):
-            bible.get_text("Genesis", "invalid")
+            bible.get_text("Genesis", "invalid")  # pyright: ignore[reportArgumentType]
 
         # Test missing keys
         with pytest.raises(ValueError, match="Each part must contain either"):

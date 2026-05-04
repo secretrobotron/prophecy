@@ -154,7 +154,7 @@ class TestStory:
     def test_init_non_dict_data(self):
         """Test Story initialization with non-dictionary data."""
         with pytest.raises(ValueError, match="Story data for 'Test' must be a dictionary"):
-            Story("Test", "invalid")
+            Story("Test", "invalid")  # pyright: ignore[reportArgumentType]
 
     def test_init_non_list_verses(self):
         """Test Story initialization with non-list verses."""

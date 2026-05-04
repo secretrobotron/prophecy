@@ -162,7 +162,7 @@ def setup_environment(args) -> None:
         os.environ["OPENAI_API_KEY"] = args.api_key
 
 
-def initialize_components(data_folder: str, logger: logging.Logger):
+def initialize_components(data_folder: str | None, logger: logging.Logger):
     """Initialize Stories, Prompts, and Bible components."""
     try:
         # Resolve the data folder path using the same logic as the individual classes
@@ -262,7 +262,9 @@ def calculate_template_checksum(populated_template: str) -> str:
     return hashlib.md5(populated_template.encode("utf-8")).hexdigest()
 
 
-def get_cached_result(cache_folder: Path, checksum: str, logger: logging.Logger) -> dict[str, Any]:
+def get_cached_result(
+    cache_folder: Path, checksum: str, logger: logging.Logger
+) -> dict[str, Any] | None:
     """Try to get cached result for the given checksum."""
     cache_file = cache_folder / f"{checksum}.json"
 

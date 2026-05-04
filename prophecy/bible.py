@@ -7,6 +7,7 @@ This module provides the Bible class for accessing biblical texts from the KJV d
 import json
 import os
 import re
+from collections.abc import Mapping
 from pathlib import Path
 
 
@@ -181,7 +182,7 @@ class Bible:
 
         return text.strip()
 
-    def get_text(self, book_title: str, *parts: dict[str, int | str]) -> str:
+    def get_text(self, book_title: str, *parts: Mapping[str, int | str]) -> str:
         """
         Extract text from the specified book and parts.
 
@@ -221,7 +222,10 @@ class Bible:
 
             # Handle range format
             if "range" in part:
-                start, end = self._parse_verse_range(part["range"])
+                range_value = part["range"]
+                if not isinstance(range_value, str):
+                    raise ValueError("'range' value must be a string like '1:1-2:7'")
+                start, end = self._parse_verse_range(range_value)
             # Handle individual chapter/verse format
             elif all(
                 key in part for key in ["start_chapter", "start_verse", "end_chapter", "end_verse"]

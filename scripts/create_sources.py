@@ -12,6 +12,7 @@ import argparse
 import re
 import sys
 from collections import defaultdict
+from typing import Any
 
 import requests
 import yaml
@@ -174,7 +175,9 @@ def build_yaml(entries, explode=False):
         return out
 
     # group by (book, source, first_range)
-    grouped = defaultdict(lambda: {"book": None, "source": None, "verses": []})
+    grouped: defaultdict[tuple, dict[str, Any]] = defaultdict(
+        lambda: {"book": None, "source": None, "verses": []}
+    )
     for e in entries:
         book = e["book"]
         src = e["source"]

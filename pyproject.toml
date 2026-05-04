@@ -63,6 +63,7 @@ quote-style = "double"
 [tool.pyright]
 include = ["prophecy", "tests", "examples", "scripts"]
 exclude = ["**/__pycache__", ".venv", "**/.venv", "data"]
+extraPaths = ["scripts"]
 pythonVersion = "3.12"
 typeCheckingMode = "basic"
 
