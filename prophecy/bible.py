@@ -8,7 +8,6 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Union
 
 
 class Bible:
@@ -19,7 +18,7 @@ class Bible:
     for extracting text based on book titles and verse ranges.
     """
 
-    def __init__(self, data_folder: Optional[str] = None):
+    def __init__(self, data_folder: str | None = None):
         """
         Initialize the Bible class.
 
@@ -42,13 +41,13 @@ class Bible:
         if not self.index_path.exists():
             raise FileNotFoundError(f"Index file not found: {self.index_path}")
 
-        with open(self.index_path, "r", encoding="utf-8") as f:
+        with open(self.index_path, encoding="utf-8") as f:
             self.index = json.load(f)
 
         # Cache for loaded books to avoid repeated file reads
-        self._book_cache: Dict[str, Dict] = {}
+        self._book_cache: dict[str, dict] = {}
 
-    def _load_book(self, book_title: str) -> Dict:
+    def _load_book(self, book_title: str) -> dict:
         """
         Load a book's data from its JSON file.
 
@@ -76,7 +75,7 @@ class Bible:
         if not book_path.exists():
             raise FileNotFoundError(f"Book file not found: {book_path}")
 
-        with open(book_path, "r", encoding="utf-8") as f:
+        with open(book_path, encoding="utf-8") as f:
             book_data = json.load(f)
 
         self._book_cache[book_title] = book_data
@@ -106,7 +105,7 @@ class Bible:
         start_chapter, start_verse, end_chapter, end_verse = match.groups()
         return ((int(start_chapter), int(start_verse)), (int(end_chapter), int(end_verse)))
 
-    def _extract_text_from_range(self, book_data: Dict, start: tuple, end: tuple) -> str:
+    def _extract_text_from_range(self, book_data: dict, start: tuple, end: tuple) -> str:
         """
         Extract text from a book within the specified verse range.
 
@@ -182,7 +181,7 @@ class Bible:
 
         return text.strip()
 
-    def get_text(self, book_title: str, *parts: Dict[str, Union[int, str]]) -> str:
+    def get_text(self, book_title: str, *parts: dict[str, int | str]) -> str:
         """
         Extract text from the specified book and parts.
 
@@ -242,7 +241,7 @@ class Bible:
         combined_text = " ".join(text_segments)
         return self._ensure_proper_spacing(combined_text)
 
-    def get_available_books(self) -> List[str]:
+    def get_available_books(self) -> list[str]:
         """
         Get a list of all available book titles.
 
@@ -251,7 +250,7 @@ class Bible:
         """
         return sorted(self.index.keys())
 
-    def get_book_info(self, book_title: str) -> Dict:
+    def get_book_info(self, book_title: str) -> dict:
         """
         Get information about a specific book.
 

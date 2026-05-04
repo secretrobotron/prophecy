@@ -3,25 +3,21 @@
 Tests for the caching functionality in __main__.py.
 """
 
-import json
-import tempfile
-import pytest
 import logging
-from pathlib import Path
-from unittest.mock import Mock, patch
-
-import sys
 import os
+import sys
+import tempfile
+from pathlib import Path
+from unittest.mock import Mock
 
 # Add the prophecy module to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from prophecy.__main__ import (
     calculate_template_checksum,
+    get_cache_folder,
     get_cached_result,
     save_cached_result,
-    get_cache_folder,
-    process_combination,
 )
 
 

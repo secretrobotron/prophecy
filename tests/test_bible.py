@@ -8,10 +8,11 @@ text extraction, and proper formatting.
 
 import json
 import os
-import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, mock_open
+from unittest.mock import patch
+
+import pytest
 
 from prophecy.bible import Bible
 

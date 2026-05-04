@@ -29,7 +29,6 @@ import json
 import os
 from collections import defaultdict
 
-
 # Mapping from abbreviations in wlc.txt to full book names
 BOOK_NAME_MAPPING = {
     "Gen": "Genesis",
@@ -84,7 +83,7 @@ def parse_wlc_file(input_file):
     # Structure: book -> chapter -> verse -> list of words
     books = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
 
-    with open(input_file, "r", encoding="utf-8") as f:
+    with open(input_file, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -175,7 +174,7 @@ def write_json_files(json_books, output_dir):
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
 
-    for book_abbrev, book_data in json_books.items():
+    for _book_abbrev, book_data in json_books.items():
         # Use full book name without spaces for filename
         full_name = book_data["book"].replace(" ", "")
         output_file = os.path.join(output_dir, f"{full_name}.json")

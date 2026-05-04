@@ -3,10 +3,10 @@
 Tests for the main CLI functionality, especially edge cases around argument handling.
 """
 
-import sys
-import os
-import tempfile
 import logging
+import os
+import sys
+import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -14,11 +14,11 @@ from unittest.mock import Mock, patch
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from prophecy.__main__ import (
-    initialize_components,
-    get_cache_folder,
     create_argument_parser,
-    setup_logging,
+    get_cache_folder,
+    initialize_components,
     setup_environment,
+    setup_logging,
 )
 
 

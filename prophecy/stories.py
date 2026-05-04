@@ -5,9 +5,9 @@ This module provides the Stories class for accessing biblical stories from the s
 """
 
 import os
-import yaml
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+
+import yaml
 
 
 class Stories:
@@ -18,7 +18,7 @@ class Stories:
     for extracting story information including title, book, and verse ranges.
     """
 
-    def __init__(self, data_folder: Optional[str] = None):
+    def __init__(self, data_folder: str | None = None):
         """
         Initialize the Stories class.
 
@@ -41,14 +41,14 @@ class Stories:
         if not self.stories_path.exists():
             raise FileNotFoundError(f"Stories file not found: {self.stories_path}")
 
-        with open(self.stories_path, "r", encoding="utf-8") as f:
+        with open(self.stories_path, encoding="utf-8") as f:
             self._stories_data = yaml.safe_load(f)
 
         if not isinstance(self._stories_data, dict):
-            raise ValueError(f"Invalid stories.yml format: expected dictionary at root level")
+            raise ValueError("Invalid stories.yml format: expected dictionary at root level")
 
     @property
-    def titles(self) -> List[str]:
+    def titles(self) -> list[str]:
         """
         Get a list of all story titles.
 
@@ -86,7 +86,7 @@ class Story:
     title, book, and verse ranges.
     """
 
-    def __init__(self, title: str, story_data: Dict):
+    def __init__(self, title: str, story_data: dict):
         """
         Initialize a Story object.
 
@@ -124,11 +124,11 @@ class Story:
         return self._book
 
     @property
-    def verses(self) -> List[str]:
+    def verses(self) -> list[str]:
         """Get the list of verse ranges for this story."""
         return self._verses.copy()  # Return a copy to prevent modification
 
-    def to_bible_parts(self) -> List[Dict[str, str]]:
+    def to_bible_parts(self) -> list[dict[str, str]]:
         """
         Convert the story's verse ranges to Bible.get_text() compatible format.
 

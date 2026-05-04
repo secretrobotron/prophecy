@@ -7,10 +7,11 @@ data access, template population, and line folding.
 """
 
 import os
-import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, Mock
+from unittest.mock import Mock, patch
+
+import pytest
 
 from prophecy.prompts import Prompts
 
@@ -405,8 +406,8 @@ class TestPromptsIntegration:
     def test_prompts_stories_bible_integration(self):
         """Test that Prompts class works with Stories and Bible classes."""
         try:
-            from prophecy.stories import Stories
             from prophecy.bible import Bible
+            from prophecy.stories import Stories
 
             prompts = Prompts("data")
             stories = Stories("data")

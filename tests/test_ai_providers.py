@@ -5,17 +5,18 @@ Tests the abstract base class, ChatGPT implementation, and factory pattern.
 """
 
 import os
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-import openai
+from unittest.mock import Mock, patch
+
 import anthropic
+import openai
+import pytest
 
 from prophecy.ai_providers import (
     AIProvider,
+    AIProviderError,
+    AIProviderFactory,
     ChatGPTProvider,
     ClaudeProvider,
-    AIProviderFactory,
-    AIProviderError,
 )
 
 

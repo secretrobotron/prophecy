@@ -10,7 +10,6 @@ import os
 import textwrap
 from pathlib import Path
 from string import Template
-from typing import Dict, List, Optional, Union
 
 
 class Prompts:
@@ -21,7 +20,7 @@ class Prompts:
     for reading prompts and populating templates with prompts and Story objects.
     """
 
-    def __init__(self, data_folder: Optional[str] = None):
+    def __init__(self, data_folder: str | None = None):
         """
         Initialize the Prompts class.
 
@@ -50,23 +49,23 @@ class Prompts:
             raise FileNotFoundError(f"Template file not found: {self.template_path}")
 
         # Load prompts data
-        self._prompts_data: List[Dict[str, str]] = []
+        self._prompts_data: list[dict[str, str]] = []
         self._load_prompts()
 
         # Load template
-        with open(self.template_path, "r", encoding="utf-8") as f:
+        with open(self.template_path, encoding="utf-8") as f:
             self._template_content = f.read()
 
     def _load_prompts(self):
         """Load prompts data from the TSV file."""
-        with open(self.prompts_path, "r", encoding="utf-8") as f:
+        with open(self.prompts_path, encoding="utf-8") as f:
             reader = csv.DictReader(f, delimiter="\t")
             self._prompts_data = list(reader)
 
         if not self._prompts_data:
             raise ValueError(f"No prompts data found in {self.prompts_path}")
 
-    def get_prompts(self) -> List[Dict[str, str]]:
+    def get_prompts(self) -> list[dict[str, str]]:
         """
         Get all prompts data.
 
@@ -75,7 +74,7 @@ class Prompts:
         """
         return [prompt.copy() for prompt in self._prompts_data]
 
-    def get_prompt_by_id(self, prompt_id: str) -> Dict[str, str]:
+    def get_prompt_by_id(self, prompt_id: str) -> dict[str, str]:
         """
         Get a specific prompt by its ID.
 
@@ -97,7 +96,7 @@ class Prompts:
             f"Prompt ID '{prompt_id}' not found. Available IDs: {', '.join(available_ids[:10])}..."
         )
 
-    def get_prompts_by_period(self, period: str) -> List[Dict[str, str]]:
+    def get_prompts_by_period(self, period: str) -> list[dict[str, str]]:
         """
         Get all prompts for a specific period.
 
@@ -109,7 +108,7 @@ class Prompts:
         """
         return [prompt.copy() for prompt in self._prompts_data if prompt["period"] == period]
 
-    def get_prompts_by_topic(self, topic: str) -> List[Dict[str, str]]:
+    def get_prompts_by_topic(self, topic: str) -> list[dict[str, str]]:
         """
         Get all prompts for a specific topic.
 
@@ -121,7 +120,7 @@ class Prompts:
         """
         return [prompt.copy() for prompt in self._prompts_data if prompt["topic"] == topic]
 
-    def get_periods(self) -> List[str]:
+    def get_periods(self) -> list[str]:
         """
         Get all unique periods in the prompts data.
 
@@ -131,7 +130,7 @@ class Prompts:
         periods = set(prompt["period"] for prompt in self._prompts_data)
         return sorted(periods)
 
-    def get_topics(self) -> List[str]:
+    def get_topics(self) -> list[str]:
         """
         Get all unique topics in the prompts data.
 
@@ -167,7 +166,7 @@ class Prompts:
 
         return "\n".join(folded_lines)
 
-    def populate_template(self, prompt_record: Dict[str, str], story_object, text: str) -> str:
+    def populate_template(self, prompt_record: dict[str, str], story_object, text: str) -> str:
         """
         Populate the template with a prompt record, story object, and text.
 
@@ -197,8 +196,8 @@ class Prompts:
                 # Check if it's a Mock object (for testing) that wasn't explicitly set
                 if hasattr(value, "_mock_name"):
                     raise AttributeError(f"Story object missing required attribute: {attr}")
-            except AttributeError:
-                raise AttributeError(f"Story object missing required attribute: {attr}")
+            except AttributeError as e:
+                raise AttributeError(f"Story object missing required attribute: {attr}") from e
 
         # Prepare template variables
         template_vars = {

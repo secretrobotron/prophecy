@@ -6,9 +6,9 @@ This script demonstrates how to use the Prompts class to access prompts data
 and populate templates with biblical stories and text.
 """
 
+from prophecy.bible import Bible
 from prophecy.prompts import Prompts
 from prophecy.stories import Stories
-from prophecy.bible import Bible
 
 
 def main():
@@ -70,7 +70,7 @@ def main():
     # Verify line folding
     lines = result.split("\n")
     max_line_length = max(len(line) for line in lines)
-    print(f"\nTemplate statistics:")
+    print("\nTemplate statistics:")
     print(f"  Total length: {len(result)} characters")
     print(f"  Number of lines: {len(lines)}")
     print(f"  Maximum line length: {max_line_length} characters")

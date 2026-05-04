@@ -7,7 +7,6 @@ based on verse ranges, similar to how stories are defined in stories.yml.
 """
 
 import sys
-import os
 from pathlib import Path
 
 # Add the prophecy package to the path

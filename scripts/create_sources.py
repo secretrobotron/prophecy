@@ -8,14 +8,14 @@ Usage:
   python build_stories_yml.py --explode --output stories_exploded.yml
 """
 
+import argparse
 import re
 import sys
-import argparse
 from collections import defaultdict
 
 import requests
-from bs4 import BeautifulSoup
 import yaml
+from bs4 import BeautifulSoup
 
 URL = "https://en.wikiversity.org/wiki/Sources_by_Chapter_and_Verse"
 

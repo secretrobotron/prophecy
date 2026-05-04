@@ -6,13 +6,13 @@ This module tests the Stories class functionality including initialization,
 story access, and integration with the Bible class.
 """
 
-import json
 import os
-import pytest
 import tempfile
-import yaml
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
+import yaml
 
 from prophecy.stories import Stories, Story
 

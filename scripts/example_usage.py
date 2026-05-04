@@ -13,7 +13,7 @@ def load_testament_index(testament_type):
         return {}
     # Use index.json for Hebrew Bible books (old_testament.json has been removed)
     filename = "data/index.json"
-    with open(filename, "r") as f:
+    with open(filename) as f:
         return json.load(f)
 
 
@@ -23,7 +23,7 @@ def get_book_data(book_name, testament_index):
         return None
 
     file_path = testament_index[book_name]
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         return json.load(f)
 
 

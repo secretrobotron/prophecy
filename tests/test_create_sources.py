@@ -8,17 +8,17 @@ in the KJV Bible by way of prophecy.Bible and prophecy module.
 
 import os
 import re
-import pytest
-import tempfile
-from unittest.mock import patch, MagicMock
 
 # Add the scripts directory to the path to import create_sources
 import sys
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 # Import the functions we want to test
-from create_sources import parse_bullet, clean_text, RANGE_TOKEN, BOOK_MAP
+from create_sources import BOOK_MAP, RANGE_TOKEN, clean_text, parse_bullet
 
 # Import the Bible class to validate ranges
 from prophecy.bible import Bible
@@ -247,7 +247,7 @@ class TestCreateSourcesWithBible:
 
     def test_all_pentateuch_books_accessible(self, bible):
         """Test that all Pentateuch books referenced in BOOK_MAP are accessible."""
-        for book_abbrev, book_name in BOOK_MAP.items():
+        for _book_abbrev, book_name in BOOK_MAP.items():
             try:
                 # Test basic access to each book
                 books = bible.get_available_books()
@@ -315,8 +315,8 @@ class TestCreateSourcesWithBible:
         mock_get.return_value = mock_response
 
         # Import and test the main functions
-        from create_sources import extract_source_list, SOURCE_HEADINGS
         from bs4 import BeautifulSoup
+        from create_sources import SOURCE_HEADINGS, extract_source_list
 
         soup = BeautifulSoup(mock_html, "html.parser")
 
@@ -340,7 +340,7 @@ class TestCreateSourcesWithBible:
                         text = bible.get_text(entry["book"], {"range": range_str})
                         assert text is not None
                         assert len(text.strip()) > 0
-                    except ValueError as e:
+                    except ValueError:
                         # Some ranges might have special formatting (like 4b) that need special handling
                         # For now, we'll just ensure the basic format is parseable
                         assert re.match(r"\d+:\d+[a-z]?(-\d+(?::\d+)?[a-z]?)?", range_str), (

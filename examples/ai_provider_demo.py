@@ -7,10 +7,11 @@ to different AI services (starting with ChatGPT) and get responses back.
 """
 
 import os
-from prophecy import AIProviderFactory, AIProviderError
+
+from prophecy import AIProviderError, AIProviderFactory
+from prophecy.bible import Bible
 from prophecy.prompts import Prompts
 from prophecy.stories import Stories
-from prophecy.bible import Bible
 
 
 def demonstrate_ai_provider_basic_usage():
@@ -40,9 +41,9 @@ def demonstrate_ai_provider_basic_usage():
         # Example prompt
         test_prompt = """
         Analyze the following biblical narrative and identify the main themes:
-        
-        "In the beginning God created the heaven and the earth. And the earth was without form, 
-        and void; and darkness was upon the face of the deep. And the Spirit of God moved upon 
+
+        "In the beginning God created the heaven and the earth. And the earth was without form,
+        and void; and darkness was upon the face of the deep. And the Spirit of God moved upon
         the face of the waters. And God said, Let there be light: and there was light."
         """
 
@@ -79,7 +80,7 @@ def demonstrate_integration_with_prophecy():
 
         print(f"✓ Loaded {prompts.get_prompt_count()} prompts")
         print(f"✓ Loaded {len(stories.titles)} stories")
-        print(f"✓ Bible component ready")
+        print("✓ Bible component ready")
 
         # Get a specific story and prompt
         story = stories.get_story("The Creation")
@@ -105,7 +106,7 @@ def demonstrate_integration_with_prophecy():
         # Create populated template
         populated_template = prompts.populate_template(prompt_data, story, biblical_text)
 
-        print(f"\n--- Populated Template ---")
+        print("\n--- Populated Template ---")
         print(f"Template length: {len(populated_template)} characters")
         print("Template preview:")
         print("-" * 50)
@@ -123,7 +124,7 @@ def demonstrate_integration_with_prophecy():
                 # Create AI provider
                 ai_provider = AIProviderFactory.create_provider("chatgpt", api_key=api_key)
 
-                print(f"\n--- Sending to AI Provider ---")
+                print("\n--- Sending to AI Provider ---")
                 print("Sending populated template to ChatGPT...")
 
                 # Send to AI
@@ -132,7 +133,7 @@ def demonstrate_integration_with_prophecy():
                     system_message="You are a biblical scholar analyzing ancient texts.",
                 )
 
-                print(f"✓ AI Analysis Complete!")
+                print("✓ AI Analysis Complete!")
                 print(f"Response length: {len(ai_response)} characters")
                 print("\nAI Response:")
                 print("=" * 60)

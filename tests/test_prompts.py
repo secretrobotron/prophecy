@@ -9,9 +9,9 @@ Requirements being tested:
 """
 
 import csv
-import os
-import pytest
 from pathlib import Path
+
+import pytest
 
 
 class TestPromptsStructure:
@@ -33,7 +33,7 @@ class TestPromptsStructure:
     def prompts_data(self, prompts_file):
         """Load the prompts.tsv file as a list of rows."""
         rows = []
-        with open(prompts_file, "r", encoding="utf-8") as f:
+        with open(prompts_file, encoding="utf-8") as f:
             reader = csv.reader(f, delimiter="\t")
             for row in reader:
                 rows.append(row)
@@ -107,7 +107,7 @@ class TestPromptsStructure:
 
             # Check each column is non-empty
             for col_idx, (col_name, cell_value) in enumerate(
-                zip(["id", "period", "topic", "prompt"], row)
+                zip(["id", "period", "topic", "prompt"], row, strict=False)
             ):
                 assert cell_value and cell_value.strip(), (
                     f"Row {row_num}, column '{col_name}' (index {col_idx}) is empty or whitespace-only"
@@ -150,7 +150,7 @@ class TestPromptsStructure:
 
     def test_tab_separation_consistency(self, prompts_file):
         """Test that the file uses consistent tab separation (no mixed delimiters)."""
-        with open(prompts_file, "r", encoding="utf-8") as f:
+        with open(prompts_file, encoding="utf-8") as f:
             content = f.read()
 
         lines = content.split("\n")
@@ -175,7 +175,6 @@ class TestPromptsStructure:
             if "," in line and "\t" in line:
                 # If both exist, tabs should be the primary delimiter
                 parts_by_tab = line.split("\t")
-                parts_by_comma = line.split(",")
 
                 # Tab separation should give us exactly 4 parts
                 assert len(parts_by_tab) == 4, (

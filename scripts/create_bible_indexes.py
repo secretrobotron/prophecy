@@ -29,7 +29,7 @@ def create_bible_indexes():
     """Create Hebrew Bible index file."""
 
     # Read the Books.json file
-    with open("data/bible-kjv/Books.json", "r") as f:
+    with open("data/bible-kjv/Books.json") as f:
         books = json.load(f)
 
     # Based on biblical canon, first 39 books are Hebrew Bible, last 27 are New Testament

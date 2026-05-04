@@ -5,12 +5,12 @@ This module provides an abstract base class for AI providers and concrete implem
 for different AI services like ChatGPT, with a factory pattern for instantiation.
 """
 
-from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List
 import os
+from abc import ABC, abstractmethod
+
+import anthropic
 import openai
 from openai import OpenAI
-import anthropic
 
 
 class AIProvider(ABC):
@@ -21,7 +21,7 @@ class AIProvider(ABC):
     for posting prompts and getting responses.
     """
 
-    def __init__(self, api_key: Optional[str] = None, **kwargs):
+    def __init__(self, api_key: str | None = None, **kwargs):
         """
         Initialize the AI provider.
 
@@ -88,7 +88,7 @@ class ChatGPTProvider(AIProvider):
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         model: str = DEFAULT_MODEL,
         max_tokens: int = DEFAULT_MAX_TOKENS,
         temperature: float = DEFAULT_TEMPERATURE,
@@ -123,15 +123,15 @@ class ChatGPTProvider(AIProvider):
         try:
             self.client = OpenAI(api_key=self.api_key)
         except Exception as e:
-            raise AIProviderError(f"Failed to initialize OpenAI client: {str(e)}")
+            raise AIProviderError(f"Failed to initialize OpenAI client: {str(e)}") from e
 
     def post_prompt(
         self,
         prompt: str,
-        model: Optional[str] = None,
-        max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None,
-        system_message: Optional[str] = None,
+        model: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+        system_message: str | None = None,
         **kwargs,
     ) -> str:
         """
@@ -176,14 +176,14 @@ class ChatGPTProvider(AIProvider):
 
             return response.choices[0].message.content.strip()
 
-        except openai.AuthenticationError:
-            raise AIProviderError("Invalid OpenAI API key")
-        except openai.RateLimitError:
-            raise AIProviderError("OpenAI API rate limit exceeded")
+        except openai.AuthenticationError as e:
+            raise AIProviderError("Invalid OpenAI API key") from e
+        except openai.RateLimitError as e:
+            raise AIProviderError("OpenAI API rate limit exceeded") from e
         except openai.APIError as e:
-            raise AIProviderError(f"OpenAI API error: {str(e)}")
+            raise AIProviderError(f"OpenAI API error: {str(e)}") from e
         except Exception as e:
-            raise AIProviderError(f"Unexpected error communicating with ChatGPT: {str(e)}")
+            raise AIProviderError(f"Unexpected error communicating with ChatGPT: {str(e)}") from e
 
     def validate_configuration(self) -> bool:
         """
@@ -206,7 +206,7 @@ class ChatGPTProvider(AIProvider):
 
         return True
 
-    def list_available_models(self) -> List[str]:
+    def list_available_models(self) -> list[str]:
         """
         Get list of available GPT models.
 
@@ -221,7 +221,7 @@ class ChatGPTProvider(AIProvider):
             gpt_models = [model.id for model in models.data if "gpt" in model.id.lower()]
             return sorted(gpt_models)
         except Exception as e:
-            raise AIProviderError(f"Failed to retrieve available models: {str(e)}")
+            raise AIProviderError(f"Failed to retrieve available models: {str(e)}") from e
 
 
 class ClaudeProvider(AIProvider):
@@ -237,7 +237,7 @@ class ClaudeProvider(AIProvider):
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         model: str = DEFAULT_MODEL,
         max_tokens: int = DEFAULT_MAX_TOKENS,
         temperature: float = DEFAULT_TEMPERATURE,
@@ -272,15 +272,15 @@ class ClaudeProvider(AIProvider):
         try:
             self.client = anthropic.Anthropic(api_key=self.api_key)
         except Exception as e:
-            raise AIProviderError(f"Failed to initialize Anthropic client: {str(e)}")
+            raise AIProviderError(f"Failed to initialize Anthropic client: {str(e)}") from e
 
     def post_prompt(
         self,
         prompt: str,
-        model: Optional[str] = None,
-        max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None,
-        system_message: Optional[str] = None,
+        model: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+        system_message: str | None = None,
         **kwargs,
     ) -> str:
         """
@@ -329,14 +329,14 @@ class ClaudeProvider(AIProvider):
 
             return response.content[0].text.strip()
 
-        except anthropic.AuthenticationError:
-            raise AIProviderError("Invalid Anthropic API key")
-        except anthropic.RateLimitError:
-            raise AIProviderError("Anthropic API rate limit exceeded")
+        except anthropic.AuthenticationError as e:
+            raise AIProviderError("Invalid Anthropic API key") from e
+        except anthropic.RateLimitError as e:
+            raise AIProviderError("Anthropic API rate limit exceeded") from e
         except anthropic.APIError as e:
-            raise AIProviderError(f"Anthropic API error: {str(e)}")
+            raise AIProviderError(f"Anthropic API error: {str(e)}") from e
         except Exception as e:
-            raise AIProviderError(f"Unexpected error communicating with Claude: {str(e)}")
+            raise AIProviderError(f"Unexpected error communicating with Claude: {str(e)}") from e
 
     def validate_configuration(self) -> bool:
         """
@@ -359,7 +359,7 @@ class ClaudeProvider(AIProvider):
 
         return True
 
-    def list_available_models(self) -> List[str]:
+    def list_available_models(self) -> list[str]:
         """
         Get list of available Claude models.
 
@@ -382,7 +382,7 @@ class ClaudeProvider(AIProvider):
             ]
             return sorted(claude_models)
         except Exception as e:
-            raise AIProviderError(f"Failed to retrieve available models: {str(e)}")
+            raise AIProviderError(f"Failed to retrieve available models: {str(e)}") from e
 
 
 class AIProviderFactory:
@@ -429,10 +429,10 @@ class AIProviderFactory:
         try:
             return provider_class(**kwargs)
         except Exception as e:
-            raise AIProviderError(f"Failed to create {provider_name} provider: {str(e)}")
+            raise AIProviderError(f"Failed to create {provider_name} provider: {str(e)}") from e
 
     @classmethod
-    def get_available_providers(cls) -> List[str]:
+    def get_available_providers(cls) -> list[str]:
         """
         Get list of available provider names.
 

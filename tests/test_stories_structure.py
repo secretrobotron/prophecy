@@ -11,11 +11,11 @@ Requirements being tested:
 """
 
 import json
-import os
-import pytest
 import re
-import yaml
 from pathlib import Path
+
+import pytest
+import yaml
 
 
 class TestStoriesStructure:
@@ -32,7 +32,7 @@ class TestStoriesStructure:
         stories_file = data_path / "stories.yml"
         assert stories_file.exists(), f"stories.yml not found at {stories_file}"
 
-        with open(stories_file, "r", encoding="utf-8") as f:
+        with open(stories_file, encoding="utf-8") as f:
             return yaml.safe_load(f)
 
     @pytest.fixture(scope="class")
@@ -41,7 +41,7 @@ class TestStoriesStructure:
         ot_file = data_path / "index.json"
         assert ot_file.exists(), f"index.json not found at {ot_file}"
 
-        with open(ot_file, "r", encoding="utf-8") as f:
+        with open(ot_file, encoding="utf-8") as f:
             return json.load(f)
 
     @pytest.fixture(scope="class")
@@ -51,7 +51,7 @@ class TestStoriesStructure:
         for book_name, book_path in index.items():
             full_path = data_path.parent / book_path
             if full_path.exists():
-                with open(full_path, "r", encoding="utf-8") as f:
+                with open(full_path, encoding="utf-8") as f:
                     cache[book_name] = json.load(f)
         return cache
 

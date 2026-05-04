@@ -12,23 +12,24 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
+
+from .bible import Bible
+from .prompts import Prompts
 
 # Import modules directly to avoid dependency issues
 from .stories import Stories
-from .prompts import Prompts
-from .bible import Bible
 
 # Try to import AI providers (optional if openai not available)
 try:
-    from .ai_providers import AIProviderFactory, AIProviderError
+    from .ai_providers import AIProviderError, AIProviderFactory
 
     AI_PROVIDERS_AVAILABLE = True
 except ImportError:
     AI_PROVIDERS_AVAILABLE = False
 
 
-def validate_story_arg(stories_obj: Stories, stories_arg: str) -> List[str]:
+def validate_story_arg(stories_obj: Stories, stories_arg: str) -> list[str]:
     """
     Validate and return list of story titles based on argument.
 
@@ -54,7 +55,7 @@ def validate_story_arg(stories_obj: Stories, stories_arg: str) -> List[str]:
         return [stories_arg]
 
 
-def validate_prompt_arg(prompts_obj: Prompts, prompt_arg: str) -> List[Dict[str, str]]:
+def validate_prompt_arg(prompts_obj: Prompts, prompt_arg: str) -> list[dict[str, str]]:
     """
     Validate and return list of prompts based on argument.
 
@@ -261,13 +262,13 @@ def calculate_template_checksum(populated_template: str) -> str:
     return hashlib.md5(populated_template.encode("utf-8")).hexdigest()
 
 
-def get_cached_result(cache_folder: Path, checksum: str, logger: logging.Logger) -> Dict[str, Any]:
+def get_cached_result(cache_folder: Path, checksum: str, logger: logging.Logger) -> dict[str, Any]:
     """Try to get cached result for the given checksum."""
     cache_file = cache_folder / f"{checksum}.json"
 
     if cache_file.exists():
         try:
-            with open(cache_file, "r", encoding="utf-8") as f:
+            with open(cache_file, encoding="utf-8") as f:
                 cached_result = json.load(f)
             logger.info(f"Found cached result: {cache_file}")
             return cached_result
@@ -278,7 +279,7 @@ def get_cached_result(cache_folder: Path, checksum: str, logger: logging.Logger)
 
 
 def save_cached_result(
-    cache_folder: Path, checksum: str, result: Dict[str, Any], logger: logging.Logger
+    cache_folder: Path, checksum: str, result: dict[str, Any], logger: logging.Logger
 ) -> None:
     """Save result to cache."""
     cache_file = cache_folder / f"{checksum}.json"
@@ -380,7 +381,7 @@ def process_all_combinations(
     logger: logging.Logger,
 ):
     """Process all story-prompt combinations."""
-    logger.info(f"=== Prophecy Processing ===")
+    logger.info("=== Prophecy Processing ===")
     logger.info(f"Stories: {len(story_titles)}")
     logger.info(f"Prompts: {len(prompt_list)}")
     logger.info(f"Mode: {'Dry run' if args.dry_run else f'AI Provider: {args.ai_provider}'}")
@@ -416,7 +417,7 @@ def process_all_combinations(
                 logger,
             )
 
-    logger.info(f"=== Processing Complete ===")
+    logger.info("=== Processing Complete ===")
     logger.info(f"Processed {current_combination} story-prompt combinations")
 
 
