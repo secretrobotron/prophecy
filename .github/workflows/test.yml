@@ -2,9 +2,14 @@ name: Tests
 
 on:
   push:
-    branches: [main]
   pull_request:
     branches: [main]
+
+# Cancel an older run on the same branch when a newer push lands.
+# (PRs share a different ref, so PR runs aren't affected by branch pushes.)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # The conda path the project shipped with — installs from pyproject.toml's
