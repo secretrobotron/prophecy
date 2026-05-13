@@ -2,31 +2,76 @@ name: Tests
 
 on:
   push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+
+# Cancel an older run on the same branch when a newer push lands.
+# (PRs share a different ref, so PR runs aren't affected by branch pushes.)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
+  # The conda path the project shipped with — installs from pyproject.toml's
+  # `dev` extra via the slim environment.yml. Preserves rvosa's workflow.
+  test-conda:
+    name: Tests (conda)
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Miniconda
-      uses: conda-incubator/setup-miniconda@v3
-      with:
-        environment-file: environment.yml
-        activate-environment: prophecy
-        auto-activate-base: false
-        
-    - name: Install pytest
-      shell: bash -l {0}
-      run: |
-        conda install -c conda-forge pytest
-        
-    - name: Run tests
-      shell: bash -l {0}
-      run: |
-        pytest tests/ -v
+      - uses: actions/checkout@v6
+
+      - name: Set up Miniconda
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          environment-file: environment.yml
+          activate-environment: prophecy
+          auto-activate: false
+
+      - name: Run tests
+        shell: bash -l {0}
+        run: pytest
+
+  # Fast pip-via-uv path. Same dependency graph as test-conda (both
+  # install from pyproject.toml [dev]), just much faster to set up
+  # and gives PR feedback on cached runs in well under a minute.
+  test-uv:
+    name: Tests (uv)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+          python-version: "3.12"
+
+      - name: Sync dependencies
+        run: uv sync --extra dev
+
+      - name: Run tests
+        run: uv run pytest
+
+  lint:
+    name: Lint & types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+          python-version: "3.12"
+
+      - name: Sync dependencies
+        run: uv sync --extra dev
+
+      - name: ruff check
+        run: uv run ruff check
+
+      - name: ruff format --check
+        run: uv run ruff format --check
+
+      - name: pyright
+        run: uv run pyright

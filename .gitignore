@@ -156,6 +156,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# Local Prophecy config (Settings.load reads ./prophecy.toml)
+prophecy.toml
+
 # Spyder project settings
 .spyderproject
 .spyproject

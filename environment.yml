@@ -3,9 +3,6 @@ channels:
   - conda-forge
 dependencies:
   - python=3.12
-  - openai
-  - anthropic
-  - requests
-  - pyyaml
-  - pandas
-  - beautifulsoup4
+  - pip
+  - pip:
+    - -e .[dev]

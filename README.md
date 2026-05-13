@@ -30,10 +30,12 @@ prophecy/
 │   └── template.txt              # AI prompt template
 ├── prophecy/                     # Python package
 │   ├── __init__.py               # Package initialization
+│   ├── __main__.py               # `python -m prophecy` CLI entry point
 │   ├── bible.py                  # Bible text access classes
 │   ├── stories.py                # Story extraction and analysis
 │   ├── prompts.py                # Prompts management
-│   └── ai_providers.py           # AI integration (OpenAI, etc.)
+│   ├── settings.py               # Layered config (defaults / TOML / env)
+│   └── ai_providers.py           # AI integration (OpenAI, Anthropic, …)
 ├── examples/                     # Demonstration scripts
 │   ├── bible_api_demo.py         # Bible API usage examples
 │   ├── ai_provider_demo.py       # AI analysis examples
@@ -92,51 +94,101 @@ See `examples/README.md` for detailed documentation of all demonstration scripts
 
 ## Installation and Setup
 
-### Prerequisites
+Clone the repository:
+
 ```bash
-# Clone the repository
 git clone https://github.com/rvosa/prophecy.git
 cd prophecy
+```
 
-# Install Python dependencies
-pip install pyyaml openai requests pandas
-# OR use conda environment
+Pick one of three install paths — all of them install the same dependency
+graph from `pyproject.toml`:
+
+### With [uv](https://github.com/astral-sh/uv) (recommended)
+
+```bash
+uv sync --extra dev
+```
+
+This creates a `.venv`, installs the package in editable mode, and pulls
+in the dev tooling (pytest, ruff, pyright). All commands below can be run
+with `uv run <cmd>`.
+
+### With conda
+
+```bash
 conda env create -f environment.yml
 conda activate prophecy
 ```
 
-### Quick Start
+### With plain pip
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+## Configuration
+
+`prophecy.settings.Settings` is a small dataclass that resolves config
+from layered sources, highest precedence first:
+
+```
+explicit kwargs  >  PROPHECY_* env vars  >  ./prophecy.toml  >  defaults
+```
+
+For a one-off override, just export an env var:
+
+```bash
+export PROPHECY_DATA_FOLDER=/path/to/data
+python -m prophecy --dry-run
+```
+
+For project-local config, create `prophecy.toml` in the repo root
+(it's gitignored):
+
+```toml
+data_folder = "data"
+cache_folder = "results"
+```
+
+API keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) are deliberately *not*
+managed by `Settings` — providers read them from the environment so
+secrets don't end up in TOML files.
+
+## Quick Start
 
 ```python
-# Import the main Bible API
-from prophecy.bible import Bible
+from prophecy import Bible, Stories
 
-# Initialize with default data folder
+# Bible text by book + verse range
 bible = Bible()
+creation = bible.get_text("Genesis", {"range": "1:1-2:7"})
+print(f"Creation story: {len(creation.split())} words")
 
-# Extract the Creation story
-creation_text = bible.get_text('Genesis', {'range': '1:1-2:7'})
-print(f"Creation story: {len(creation_text.split())} words")
+# Or via the higher-level Stories API
+stories = Stories()
+flood = stories.get_story("The Great Flood")
+flood_text = bible.get_text(flood.book, *flood.to_bible_parts())
 
-# Load stories from YAML
-import yaml
-with open('data/stories.yml') as f:
-    stories = yaml.safe_load(f)
-
-# Extract a complete story
-flood_story = stories['The Great Flood']
-flood_text = bible.get_text(flood_story['book'], 
-                           {'range': flood_story['verses'][0]})
-
-# Use the Stories API for easier access
-from prophecy.stories import Stories
-story_api = Stories()
-story_text = story_api.get_story_text('The Creation')
-
-# AI-powered analysis (requires OpenAI API key)
-from prophecy.ai_providers import ChatGPTProvider
+# AI-powered analysis (requires OPENAI_API_KEY)
+from prophecy import ChatGPTProvider
 ai = ChatGPTProvider()
-analysis = ai.analyze_text(creation_text, "Analyze the tone and themes")
+analysis = ai.post_prompt(
+    f"Analyze the tone and themes:\n\n{creation}",
+    system_message="You are a biblical scholar.",
+)
+```
+
+To run the full story × prompt × LLM pipeline, use the CLI:
+
+```bash
+# Dry run — prints the populated template, no API calls
+uv run python -m prophecy --stories "The Creation" --prompt 1 --dry-run
+
+# Real run — caches results in data/results/<md5>.json
+uv run python -m prophecy --stories "The Creation" --prompt 1
 ```
 
 ## Story Coverage
@@ -191,19 +243,28 @@ Contributions welcome! Areas of interest:
 
 ### Getting Started with Development
 
-1. **Fork and clone the repository**
-2. **Set up development environment:**
+1. **Fork and clone the repository.**
+2. **Set up the dev environment** (see the install paths above —
+   `uv sync --extra dev` is the fastest).
+3. **Run the test, lint, and typecheck pipeline locally before
+   pushing:**
    ```bash
-   pip install -r requirements.txt  # or use environment.yml
+   uv run pytest          # 194 tests
+   uv run ruff check      # linter
+   uv run ruff format     # auto-formatter
+   uv run pyright         # type checker
    ```
-3. **Run tests to ensure everything works:**
+4. **Verify the demo scripts still work:**
    ```bash
-   python -m pytest tests/ -v
+   uv run python examples/bible_api_demo.py
    ```
-4. **Verify examples work:**
-   ```bash
-   python examples/bible_api_demo.py
-   ```
+
+CI runs three jobs on every push and PR to `main`:
+
+- `test-conda` — original miniconda flow (preserved for the project's
+  conda users).
+- `test-uv` — same dependency graph via uv, fast feedback on PRs.
+- `lint` — `ruff check`, `ruff format --check`, and `pyright`.
 
 See individual README files in `data/`, `examples/`, `scripts/`, and `tests/` directories for specific contribution guidelines.
 

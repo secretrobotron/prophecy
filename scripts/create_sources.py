@@ -8,14 +8,15 @@ Usage:
   python build_stories_yml.py --explode --output stories_exploded.yml
 """
 
+import argparse
 import re
 import sys
-import argparse
 from collections import defaultdict
+from typing import Any
 
 import requests
-from bs4 import BeautifulSoup
 import yaml
+from bs4 import BeautifulSoup
 
 URL = "https://en.wikiversity.org/wiki/Sources_by_Chapter_and_Verse"
 
@@ -45,6 +46,7 @@ RANGE_SPLIT = re.compile(r",\s*")
 BOOK_LINE = re.compile(r"^(Gen|Exo|Lev|Num|Deu)\s+(.*)$")
 SPACES = re.compile(r"\s+")
 
+
 def clean_text(s: str) -> str:
     s = s.replace("\xa0", " ")
     s = SPACES.sub(" ", s).strip()
@@ -56,24 +58,25 @@ def clean_text(s: str) -> str:
 def normalize_range_format(range_str: str) -> str:
     """
     Normalize range format to standard chapter:verse-chapter:verse format.
-    
+
     Examples:
         '1:1-7' -> '1:1-1:7'  (same chapter)
         '2:4b-26' -> '2:4b-2:26'  (same chapter with suffix)
         '1:1-2:7' -> '1:1-2:7'  (cross chapter, already correct)
     """
-    if '-' not in range_str:
+    if "-" not in range_str:
         # Single verse, no normalization needed
         return range_str
-        
-    start, end = range_str.split('-', 1)
-    
+
+    start, end = range_str.split("-", 1)
+
     # If end doesn't contain ':', it's a verse in the same chapter as start
-    if ':' not in end:
-        start_chapter = start.split(':')[0]
+    if ":" not in end:
+        start_chapter = start.split(":")[0]
         end = f"{start_chapter}:{end}"
-        
+
     return f"{start}-{end}"
+
 
 def parse_bullet(txt: str, source_tag: str):
     """
@@ -123,6 +126,7 @@ def parse_bullet(txt: str, source_tag: str):
         return None
     return {"book": book, "ranges": clean_ranges, "source": source_tag, "full_line": txt}
 
+
 def extract_source_list(soup: BeautifulSoup, heading_regex: str, tag: str):
     """
     Find the H2 whose text matches heading_regex, then collect all <li> items
@@ -152,6 +156,7 @@ def extract_source_list(soup: BeautifulSoup, heading_regex: str, tag: str):
 
     return items
 
+
 def build_yaml(entries, explode=False):
     """
     Group entries so each YAML item represents
@@ -170,7 +175,9 @@ def build_yaml(entries, explode=False):
         return out
 
     # group by (book, source, first_range)
-    grouped = defaultdict(lambda: {"book": None, "source": None, "verses": []})
+    grouped: defaultdict[tuple, dict[str, Any]] = defaultdict(
+        lambda: {"book": None, "source": None, "verses": []}
+    )
     for e in entries:
         book = e["book"]
         src = e["source"]
@@ -194,6 +201,7 @@ def build_yaml(entries, explode=False):
         key = f"{book} {first} ({src})"
         out[key] = {"book": book, "verses": verses, "source": src}
     return out
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -220,6 +228,7 @@ def main():
         yaml.safe_dump(yaml_obj, f, sort_keys=False, allow_unicode=True)
 
     print(f"Wrote {len(yaml_obj)} stories to {args.output}")
+
 
 if __name__ == "__main__":
     main()
