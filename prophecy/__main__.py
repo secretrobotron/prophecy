@@ -9,7 +9,6 @@ import argparse
 import hashlib
 import json
 import logging
-import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -21,7 +20,7 @@ from .stories import Stories
 
 # Try to import AI providers (optional if openai not available)
 try:
-    from .ai_providers import AIProviderError, AIProviderFactory
+    from .providers import AIProviderError, AIProviderFactory
 
     AI_PROVIDERS_AVAILABLE = True
 except ImportError:
@@ -106,8 +105,11 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--ai-provider",
         default="chatgpt",
-        choices=["chatgpt", "openai"],
-        help="AI provider to use (default: chatgpt)",
+        choices=["chatgpt", "openai", "claude", "anthropic", "claude-cli", "local-claude"],
+        help=(
+            'AI provider to use (default: chatgpt). "claude-cli"/"local-claude" '
+            "shells out to the `claude` CLI and needs no API key."
+        ),
     )
 
     parser.add_argument(
@@ -196,9 +198,16 @@ def initialize_ai_provider(args, logger: logging.Logger):
         logger.error("AI providers not available. Install 'openai' package or use --dry-run")
         sys.exit(1)
 
+    # Each provider falls back to its own env var when api_key is None,
+    # so only override with --api-key when the user explicitly supplied one.
+    factory_kwargs = {}
+    if args.api_key:
+        factory_kwargs["api_key"] = args.api_key
+
     try:
         ai_provider = AIProviderFactory.create_provider(
-            args.ai_provider, api_key=args.api_key or os.getenv("OPENAI_API_KEY")
+            args.ai_provider,
+            **factory_kwargs,
         )
 
         if not ai_provider.validate_configuration():
@@ -210,7 +219,9 @@ def initialize_ai_provider(args, logger: logging.Logger):
     except (ValueError, AIProviderError) as e:
         logger.error(f"Failed to initialize AI provider: {e}")
         if "API key" in str(e):
-            logger.error("Make sure to set OPENAI_API_KEY environment variable or use --api-key")
+            logger.error(
+                "Set the appropriate API key env var (OPENAI_API_KEY or ANTHROPIC_API_KEY) or pass --api-key"
+            )
         sys.exit(1)
 
 
