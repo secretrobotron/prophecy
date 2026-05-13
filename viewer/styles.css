@@ -1,0 +1,279 @@
+:root {
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #6a6a6a;
+  --border: #d8d8d8;
+  --accent: #2b6cb0;
+  --accent-bg: #ebf3fb;
+  --row-hover: #f6f8fa;
+  --true: #2f855a;
+  --false: #c53030;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 16px;
+  align-items: center;
+}
+
+h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.tab-button {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 6px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.tab-button:hover { background: var(--row-hover); }
+
+.tab-button.active {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+main {
+  padding: 16px 24px;
+}
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  align-items: end;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--row-hover);
+  border-radius: 6px;
+}
+
+.filters label {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  color: var(--muted);
+  gap: 4px;
+}
+
+.filters input,
+.filters select {
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: white;
+  min-width: 140px;
+}
+
+.filters button {
+  font: inherit;
+  padding: 6px 14px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.filters button:hover { background: #2255a0; }
+
+/* Multi-select dropdown — visually mirrors a native <select> when closed. */
+.multi-dropdown {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  color: var(--muted);
+  gap: 4px;
+  min-width: 180px;
+}
+
+.multi-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.multi-toggle {
+  font: inherit;
+  font-size: 14px;
+  color: var(--fg);
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  cursor: pointer;
+  min-width: 0;
+  text-align: left;
+}
+
+.multi-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+.multi-summary {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.multi-chevron {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 11px;
+  transition: transform 0.12s ease;
+}
+
+.multi-toggle[aria-expanded="true"] .multi-chevron {
+  transform: rotate(180deg);
+}
+
+.multi-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  z-index: 10;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 6px 8px;
+  min-width: 220px;
+  max-width: 320px;
+}
+
+.multi-actions {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.multi-actions button {
+  font: inherit;
+  font-size: 11px;
+  padding: 1px 6px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--accent);
+  border-radius: 3px;
+  cursor: pointer;
+  text-transform: lowercase;
+}
+
+.multi-actions button:hover {
+  background: var(--accent-bg);
+}
+
+.checkbox-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 220px;
+  overflow-y: auto;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.checkbox-list label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+
+.checkbox-list label:hover {
+  background: var(--row-hover);
+}
+
+.checkbox-list input[type="checkbox"] {
+  min-width: 0;
+  margin: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th, td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+th {
+  background: var(--row-hover);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  position: sticky;
+  top: 0;
+}
+
+tbody tr:hover { background: var(--row-hover); }
+
+.muted { color: var(--muted); font-size: 12px; }
+.mono { font-family: var(--mono); font-size: 12px; }
+
+.bool-true { color: var(--true); font-weight: 600; }
+.bool-false { color: var(--false); }
+
+.reason {
+  max-width: 480px;
+  white-space: pre-wrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+footer {
+  padding: 8px 24px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted);
+}

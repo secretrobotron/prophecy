@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Prophecy Viewer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Prophecy Viewer</h1>
+    <nav class="tabs">
+      <button class="tab-button active" data-tab="prompts">Prompts</button>
+      <button class="tab-button" data-tab="responses">Responses</button>
+      <button class="tab-button" data-tab="query">Query</button>
+    </nav>
+    <div id="manifest-summary" class="muted"></div>
+  </header>
+
+  <main>
+    <section id="tab-prompts" class="tab-panel active">
+      <div class="filters">
+        <label>Period
+          <select id="prompts-period"><option value="">(all)</option></select>
+        </label>
+        <label>Topic
+          <select id="prompts-topic"><option value="">(all)</option></select>
+        </label>
+        <label>Search
+          <input type="search" id="prompts-search" placeholder="prompt text..." />
+        </label>
+        <span class="muted" id="prompts-count"></span>
+      </div>
+      <table id="prompts-table">
+        <thead>
+          <tr><th>ID</th><th>Period</th><th>Topic</th><th>Prompt</th><th>Results</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section id="tab-responses" class="tab-panel">
+      <div class="filters">
+        <label>Book
+          <select id="responses-book"><option value="">(all)</option></select>
+        </label>
+        <label>Story
+          <select id="responses-story"><option value="">(all)</option></select>
+        </label>
+        <label>Period
+          <select id="responses-period"><option value="">(all)</option></select>
+        </label>
+        <label>Topic
+          <select id="responses-topic"><option value="">(all)</option></select>
+        </label>
+        <label>Engine
+          <select id="responses-engine"><option value="">(all)</option></select>
+        </label>
+        <label>Answer
+          <select id="responses-answer">
+            <option value="">(any)</option>
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+        </label>
+        <label>Min certainty
+          <input type="number" id="responses-min-certainty" min="0" max="100" step="5" value="0" />
+        </label>
+        <span class="muted" id="responses-count"></span>
+      </div>
+      <table id="responses-table">
+        <thead>
+          <tr>
+            <th>Story</th>
+            <th>Book</th>
+            <th>Prompt</th>
+            <th>Period</th>
+            <th>Topic</th>
+            <th>Engine</th>
+            <th>Answer</th>
+            <th>Cert</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section id="tab-query" class="tab-panel">
+      <div class="filters">
+        <div class="multi-dropdown" data-target="query-period">
+          <span class="multi-label">Period</span>
+          <button type="button" class="multi-toggle" aria-expanded="false" aria-haspopup="listbox">
+            <span class="multi-summary">All</span>
+            <span class="multi-chevron" aria-hidden="true">&#9662;</span>
+          </button>
+          <div class="multi-panel" hidden>
+            <div class="multi-actions">
+              <button type="button" data-target="query-period" data-action="all">all</button>
+              <button type="button" data-target="query-period" data-action="none">none</button>
+            </div>
+            <div id="query-period" class="checkbox-list"></div>
+          </div>
+        </div>
+
+        <div class="multi-dropdown" data-target="query-topic">
+          <span class="multi-label">Topic</span>
+          <button type="button" class="multi-toggle" aria-expanded="false" aria-haspopup="listbox">
+            <span class="multi-summary">All</span>
+            <span class="multi-chevron" aria-hidden="true">&#9662;</span>
+          </button>
+          <div class="multi-panel" hidden>
+            <div class="multi-actions">
+              <button type="button" data-target="query-topic" data-action="all">all</button>
+              <button type="button" data-target="query-topic" data-action="none">none</button>
+            </div>
+            <div id="query-topic" class="checkbox-list"></div>
+          </div>
+        </div>
+
+        <div class="multi-dropdown" data-target="query-engine">
+          <span class="multi-label">Engine</span>
+          <button type="button" class="multi-toggle" aria-expanded="false" aria-haspopup="listbox">
+            <span class="multi-summary">All</span>
+            <span class="multi-chevron" aria-hidden="true">&#9662;</span>
+          </button>
+          <div class="multi-panel" hidden>
+            <div class="multi-actions">
+              <button type="button" data-target="query-engine" data-action="all">all</button>
+              <button type="button" data-target="query-engine" data-action="none">none</button>
+            </div>
+            <div id="query-engine" class="checkbox-list"></div>
+          </div>
+        </div>
+
+        <label>Book
+          <select id="query-book"><option value="">(all)</option></select>
+        </label>
+        <label>Story
+          <select id="query-story"><option value="">(all)</option></select>
+        </label>
+        <label>Min certainty
+          <input type="number" id="query-min-certainty" min="0" max="100" step="5" value="0" />
+        </label>
+        <button id="query-run">Run query</button>
+      </div>
+      <table id="query-table">
+        <thead>
+          <tr>
+            <th>Story</th>
+            <th>Book</th>
+            <th>Period</th>
+            <th>Topic</th>
+            <th>Engine</th>
+            <th>Hits</th>
+            <th>Total</th>
+            <th>Hit %</th>
+            <th>Avg cert</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <p class="muted" id="query-summary"></p>
+    </section>
+  </main>
+
+  <footer>
+    <span id="data-source" class="muted"></span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

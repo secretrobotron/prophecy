@@ -159,6 +159,9 @@ venv.bak/
 # Local Prophecy config (Settings.load reads ./prophecy.toml)
 prophecy.toml
 
+# Generated viewer bundle (produced by `python -m prophecy export`)
+viewer/data/
+
 # Spyder project settings
 .spyderproject
 .spyproject
