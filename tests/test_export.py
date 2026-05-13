@@ -41,14 +41,37 @@ def data_folder():
         cache = data / "results"
         cache.mkdir()
         results = [
-            {"answer": True, "certainty": 90, "story": "The Creation", "prompt": "1",
-             "engine": "chatgpt:gpt-4", "reason": "yes"},
-            {"answer": False, "certainty": 60, "story": "The Creation", "prompt": "2",
-             "engine": "chatgpt:gpt-4", "reason": "no"},
-            {"answer": True, "certainty": 80, "story": "The Exodus", "prompt": "1",
-             "engine": "claude:haiku", "reason": "yes"},
-            {"answer": True, "certainty": 85, "story": "The Exodus", "prompt": "3",
-             "reason": "destruction"},  # legacy: no engine
+            {
+                "answer": True,
+                "certainty": 90,
+                "story": "The Creation",
+                "prompt": "1",
+                "engine": "chatgpt:gpt-4",
+                "reason": "yes",
+            },
+            {
+                "answer": False,
+                "certainty": 60,
+                "story": "The Creation",
+                "prompt": "2",
+                "engine": "chatgpt:gpt-4",
+                "reason": "no",
+            },
+            {
+                "answer": True,
+                "certainty": 80,
+                "story": "The Exodus",
+                "prompt": "1",
+                "engine": "claude:haiku",
+                "reason": "yes",
+            },
+            {
+                "answer": True,
+                "certainty": 85,
+                "story": "The Exodus",
+                "prompt": "3",
+                "reason": "destruction",
+            },  # legacy: no engine
         ]
         for i, r in enumerate(results):
             (cache / f"r{i}.json").write_text(json.dumps(r), encoding="utf-8")
@@ -87,17 +110,13 @@ def test_export_writes_manifest_and_shards(data_folder):
         assert genesis_shard.exists()
         assert exodus_shard.exists()
 
-        genesis_rows = [
-            json.loads(line) for line in genesis_shard.read_text().splitlines() if line
-        ]
+        genesis_rows = [json.loads(line) for line in genesis_shard.read_text().splitlines() if line]
         assert len(genesis_rows) == 2
         assert all(r["book"] == "Genesis" for r in genesis_rows)
         # Enrichment: period/topic resolved from prompt id
         assert any(r["period"] == "Politics" and r["topic"] == "Populism" for r in genesis_rows)
 
-        exodus_rows = [
-            json.loads(line) for line in exodus_shard.read_text().splitlines() if line
-        ]
+        exodus_rows = [json.loads(line) for line in exodus_shard.read_text().splitlines() if line]
         assert len(exodus_rows) == 2
         # Legacy row gets engine="unknown"
         assert any(r["engine"] == "unknown" for r in exodus_rows)

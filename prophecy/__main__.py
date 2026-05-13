@@ -49,9 +49,7 @@ def validate_story_arg(stories_obj: Stories, stories_arg: str) -> list[str]:
     return [canonical]
 
 
-def select_stories(
-    stories_obj: Stories, stories_arg: str, books: list[str] | None
-) -> list[str]:
+def select_stories(stories_obj: Stories, stories_arg: str, books: list[str] | None) -> list[str]:
     """
     Resolve the user's story selection from --stories and --book.
 
@@ -483,9 +481,7 @@ def get_cache_folder(settings: Settings, logger: logging.Logger) -> Path:
         sys.exit(1)
 
 
-def calculate_template_checksum(
-    populated_template: str, engine_id: str | None = None
-) -> str:
+def calculate_template_checksum(populated_template: str, engine_id: str | None = None) -> str:
     """
     Calculate MD5 checksum of the populated template, optionally namespaced
     by an engine identifier so identical prompts sent to different engines
@@ -559,8 +555,10 @@ def process_combination(
         print("=" * 50)
         print()
     else:
-        # Engine id namespaces the cache so per-engine answers don't collide.
-        engine_id = ai_provider.engine_id if ai_provider is not None else None
+        # ai_provider is required outside dry-run mode; the entry point only
+        # threads None through when is_dry_run=True (which is the if-branch).
+        assert ai_provider is not None, "ai_provider must be set when is_dry_run is False"
+        engine_id = ai_provider.engine_id
 
         # Calculate checksum for caching
         checksum = calculate_template_checksum(populated_template, engine_id)
@@ -784,9 +782,7 @@ def _create_query_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _load_cached_results(
-    cache_folder: Path, logger: logging.Logger
-) -> list[dict[str, Any]]:
+def _load_cached_results(cache_folder: Path, logger: logging.Logger) -> list[dict[str, Any]]:
     """Read every *.json file in the cache folder. Skip unreadable/non-result files."""
     if not cache_folder.exists():
         logger.warning(f"Cache folder does not exist: {cache_folder}")
@@ -807,7 +803,9 @@ def _load_cached_results(
     return results
 
 
-def _resolve_prompt_meta(prompt_id: str, prompt_meta: dict[str, tuple[str, str]]) -> tuple[str, str]:
+def _resolve_prompt_meta(
+    prompt_id: str, prompt_meta: dict[str, tuple[str, str]]
+) -> tuple[str, str]:
     """Look up (period, topic) for a prompt id. Falls back for synthetic concat:* ids."""
     if prompt_id in prompt_meta:
         return prompt_meta[prompt_id]
@@ -843,19 +841,11 @@ def _format_table(rows: list[dict[str, Any]]) -> str:
             return f"{value:.0f}"
         return str(value)
 
-    rendered = [
-        {key: fmt(key, row[key]) for key, _ in columns}
-        for row in rows
-    ]
-    widths = {
-        key: max(len(header), *(len(r[key]) for r in rendered))
-        for key, header in columns
-    }
+    rendered = [{key: fmt(key, row[key]) for key, _ in columns} for row in rows]
+    widths = {key: max(len(header), *(len(r[key]) for r in rendered)) for key, header in columns}
     header_line = "  ".join(header.ljust(widths[key]) for key, header in columns)
     sep_line = "  ".join("-" * widths[key] for key, _ in columns)
-    body_lines = [
-        "  ".join(r[key].ljust(widths[key]) for key, _ in columns) for r in rendered
-    ]
+    body_lines = ["  ".join(r[key].ljust(widths[key]) for key, _ in columns) for r in rendered]
     return "\n".join([header_line, sep_line, *body_lines])
 
 
@@ -892,9 +882,7 @@ def query_command(argv: list[str]) -> int:
                 normalize_known(p, prompts.get_periods(), "Period") for p in period_filter
             ]
         if topic_filter:
-            topic_filter = [
-                normalize_known(t, prompts.get_topics(), "Topic") for t in topic_filter
-            ]
+            topic_filter = [normalize_known(t, prompts.get_topics(), "Topic") for t in topic_filter]
         book_arg = args.book
         story_arg = args.story
         if book_arg:
@@ -930,9 +918,7 @@ def query_command(argv: list[str]) -> int:
             continue
 
         key = (story_title, book, period, topic, engine)
-        bucket = agg.setdefault(
-            key, {"hits": 0, "total": 0, "cert_sum": 0.0}
-        )
+        bucket = agg.setdefault(key, {"hits": 0, "total": 0, "cert_sum": 0.0})
         bucket["total"] += 1
         if r.get("answer"):
             bucket["hits"] += 1
@@ -955,16 +941,12 @@ def query_command(argv: list[str]) -> int:
             }
         )
 
-    summary.sort(
-        key=lambda r: (-r["hit_rate"], r["story"], r["period"], r["topic"], r["engine"])
-    )
+    summary.sort(key=lambda r: (-r["hit_rate"], r["story"], r["period"], r["topic"], r["engine"]))
 
     if args.format == "json":
         print(json.dumps(summary, indent=2))
     elif args.format == "tsv":
-        print(
-            "story\tbook\tperiod\ttopic\tengine\thits\ttotal\thit_rate\tavg_certainty"
-        )
+        print("story\tbook\tperiod\ttopic\tengine\thits\ttotal\thit_rate\tavg_certainty")
         for row in summary:
             print(
                 f"{row['story']}\t{row['book']}\t{row['period']}\t{row['topic']}\t{row['engine']}\t"

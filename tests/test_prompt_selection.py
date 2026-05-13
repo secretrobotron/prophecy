@@ -42,9 +42,7 @@ def data_folder():
             "5\tPolitics\tElitism\tThe leaders rage at the people\n",
             encoding="utf-8",
         )
-        (data / "template.txt").write_text(
-            '"$prompt"\n\n"$text"\n', encoding="utf-8"
-        )
+        (data / "template.txt").write_text('"$prompt"\n\n"$text"\n', encoding="utf-8")
         (data / "stories.yml").write_text(
             "Sample Story:\n  book: Genesis\n  verses: ['1:1']\n"
             "Exodus Story:\n  book: Exodus\n  verses: ['1:1']\n"
@@ -271,9 +269,7 @@ class TestBuildConcatenatedPrompt:
             {"id": "3", "period": "Politics", "topic": "Populism", "prompt": "A"},
             {"id": "5", "period": "Politics", "topic": "Elitism", "prompt": "B"},
         ]
-        combined = build_concatenated_prompt(
-            records, "Politics", ["Populism", "Elitism"]
-        )
+        combined = build_concatenated_prompt(records, "Politics", ["Populism", "Elitism"])
         assert combined["topic"] == "Populism+Elitism"
         assert combined["id"] == "concat:Politics:Populism+Elitism"
 
@@ -476,9 +472,7 @@ class TestQueryCommand:
 
         ai_provider = MagicMock()
         ai_provider.engine_id = "stub:1"
-        ai_provider.post_prompt.return_value = (
-            '{"answer":true,"reason":"stub","certainty":42}'
-        )
+        ai_provider.post_prompt.return_value = '{"answer":true,"reason":"stub","certainty":42}'
 
         args = MagicMock()
         args.dry_run = False
@@ -536,6 +530,4 @@ class TestQueryCommand:
             "story\tbook\tperiod\ttopic\tengine\thits\ttotal\thit_rate\tavg_certainty"
         )
         assert len(lines) == 2
-        assert lines[1].startswith(
-            "Sample Story\tGenesis\tPolitics\tPopulism\tunknown\t1\t1\t"
-        )
+        assert lines[1].startswith("Sample Story\tGenesis\tPolitics\tPopulism\tunknown\t1\t1\t")
