@@ -17,6 +17,7 @@ class ChatGPTProvider(AIProvider):
     This class provides integration with OpenAI's ChatGPT API.
     """
 
+    NAME = "chatgpt"
     DEFAULT_MODEL = "gpt-3.5-turbo"
     DEFAULT_MAX_TOKENS = 1000
     DEFAULT_TEMPERATURE = 0.7

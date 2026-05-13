@@ -16,6 +16,7 @@ class ClaudeProvider(AIProvider):
     This class provides integration with Anthropic's Claude API.
     """
 
+    NAME = "claude"
     DEFAULT_MODEL = "claude-3-haiku-20240307"
     DEFAULT_MAX_TOKENS = 1000
     DEFAULT_TEMPERATURE = 0.7

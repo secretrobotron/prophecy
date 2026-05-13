@@ -42,6 +42,7 @@ class ClaudeCLIProvider(AIProvider):
     returns an envelope with a `result` field containing the assistant text.
     """
 
+    NAME = "claude-cli"
     DEFAULT_MODEL = "haiku"
     DEFAULT_BINARY = "claude"
     DEFAULT_TIMEOUT = 300

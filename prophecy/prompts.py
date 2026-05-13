@@ -123,6 +123,34 @@ class Prompts:
         """
         return [prompt.copy() for prompt in self._prompts_data if prompt["topic"] == topic]
 
+    def filter(
+        self,
+        period: str | list[str] | None = None,
+        topic: str | list[str] | None = None,
+    ) -> list[dict[str, str]]:
+        """
+        Get prompts narrowed by period and/or topic.
+
+        Args:
+            period: If set, keep only prompts whose period matches. May be a
+                single string or a list of strings (any-of match).
+            topic: If set, keep only prompts whose topic matches. Same shape
+                rules as ``period``.
+
+        Returns:
+            List of prompt dictionaries matching the filters (intersection
+            across period and topic, any-of within each filter).
+            With no filters set, returns all prompts.
+        """
+        results = [prompt.copy() for prompt in self._prompts_data]
+        if period is not None:
+            period_set = {period} if isinstance(period, str) else set(period)
+            results = [p for p in results if p["period"] in period_set]
+        if topic is not None:
+            topic_set = {topic} if isinstance(topic, str) else set(topic)
+            results = [p for p in results if p["topic"] in topic_set]
+        return results
+
     def get_periods(self) -> list[str]:
         """
         Get all unique periods in the prompts data.

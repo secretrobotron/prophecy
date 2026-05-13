@@ -19,6 +19,10 @@ class AIProvider(ABC):
     for posting prompts and getting responses.
     """
 
+    # Stable short identifier used in cache JSON and cache keys.
+    # Subclasses must override.
+    NAME: str = "abstract"
+
     def __init__(self, api_key: str | None = None, **kwargs):
         """
         Initialize the AI provider.
@@ -65,3 +69,22 @@ class AIProvider(ABC):
             String name of the provider
         """
         return self.__class__.__name__
+
+    @property
+    def engine_id(self) -> str:
+        """
+        Stable, hashable identifier for this provider+model.
+
+        Used both as a tag on cached results (so downstream queries can
+        distinguish answers from different engines) and as an input to the
+        cache key (so identical prompts sent to different engines don't
+        collide).
+
+        Default format is ``"<NAME>:<model>"`` when the provider has a
+        ``model`` attribute, otherwise just ``NAME``. Subclasses can
+        override if they need a richer identifier.
+        """
+        model = getattr(self, "model", None)
+        if model:
+            return f"{self.NAME}:{model}"
+        return self.NAME
