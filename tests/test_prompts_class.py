@@ -21,14 +21,16 @@ class TestPrompts:
 
     @pytest.fixture
     def temp_data_folder(self):
-        """Create a temporary data folder with test prompts.tsv and template.txt."""
+        """Create a temporary data folder with test data/prompts/{prompts.tsv,template.txt}."""
         with tempfile.TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir) / "data"
             data_dir.mkdir()
+            prompts_dir = data_dir / "prompts"
+            prompts_dir.mkdir()
 
             # Create test prompts.tsv with actual tab characters
-            with open(data_dir / "prompts.tsv", "w", encoding="utf-8") as f:
-                f.write("id\tperiod\ttopic\tprompt\n")
+            with open(prompts_dir / "prompts.tsv", "w", encoding="utf-8") as f:
+                f.write("id\tcategory\ttopic\tprompt\n")
                 f.write(
                     "1\tBabylonian\tGeopolitical Danger\tThere is an upcoming significant man-made destruction\n"
                 )
@@ -41,7 +43,7 @@ class TestPrompts:
                 f.write("4\tBabylonian\tGeopolitical Danger\tThere is a great disaster\n")
 
             # Create test template.txt
-            template_content = """Question 1: The fragment originates in the $period period.
+            template_content = """Question 1: The fragment originates in the $category category.
 
 Question 2: The fragment pertains to the topic: "$topic".
 
@@ -51,7 +53,7 @@ Below is the text fragment:
 
 $text"""
 
-            with open(data_dir / "template.txt", "w", encoding="utf-8") as f:
+            with open(prompts_dir / "template.txt", "w", encoding="utf-8") as f:
                 f.write(template_content)
 
             yield str(data_dir)
@@ -88,21 +90,21 @@ $text"""
 
     def test_init_missing_prompts_file(self, temp_data_folder):
         """Test Prompts initialization with missing prompts.tsv."""
-        os.remove(Path(temp_data_folder) / "prompts.tsv")
+        os.remove(Path(temp_data_folder) / "prompts" / "prompts.tsv")
         with pytest.raises(FileNotFoundError, match="Prompts file not found"):
             Prompts(temp_data_folder)
 
     def test_init_missing_template_file(self, temp_data_folder):
         """Test Prompts initialization with missing template.txt."""
-        os.remove(Path(temp_data_folder) / "template.txt")
+        os.remove(Path(temp_data_folder) / "prompts" / "template.txt")
         with pytest.raises(FileNotFoundError, match="Template file not found"):
             Prompts(temp_data_folder)
 
     def test_init_empty_prompts_file(self, temp_data_folder):
         """Test Prompts initialization with empty prompts.tsv."""
         # Write only header
-        with open(Path(temp_data_folder) / "prompts.tsv", "w") as f:
-            f.write("id\tperiod\ttopic\tprompt\n")
+        with open(Path(temp_data_folder) / "prompts" / "prompts.tsv", "w") as f:
+            f.write("id\tcategory\ttopic\tprompt\n")
 
         with pytest.raises(ValueError, match="No prompts data found"):
             Prompts(temp_data_folder)
@@ -118,11 +120,11 @@ $text"""
         # Check structure of first prompt
         first_prompt = all_prompts[0]
         assert "id" in first_prompt
-        assert "period" in first_prompt
+        assert "category" in first_prompt
         assert "topic" in first_prompt
         assert "prompt" in first_prompt
         assert first_prompt["id"] == "1"
-        assert first_prompt["period"] == "Babylonian"
+        assert first_prompt["category"] == "Babylonian"
         assert first_prompt["topic"] == "Geopolitical Danger"
 
         # Test that it returns a copy (modifications don't affect original)
@@ -136,7 +138,7 @@ $text"""
 
         prompt = prompts.get_prompt_by_id("2")
         assert prompt["id"] == "2"
-        assert prompt["period"] == "Persian"
+        assert prompt["category"] == "Persian"
         assert prompt["topic"] == "Cyrus the Great"
         assert prompt["prompt"] == "A messenger of Yahweh entered a city in peace"
 
@@ -151,21 +153,21 @@ $text"""
         with pytest.raises(ValueError, match="Prompt ID '999' not found"):
             prompts.get_prompt_by_id("999")
 
-    def test_get_prompts_by_period(self, temp_data_folder):
-        """Test getting prompts filtered by period."""
+    def test_get_prompts_by_category(self, temp_data_folder):
+        """Test getting prompts filtered by category."""
         prompts = Prompts(temp_data_folder)
 
-        babylonian_prompts = prompts.get_prompts_by_period("Babylonian")
+        babylonian_prompts = prompts.get_prompts_by_category("Babylonian")
         assert len(babylonian_prompts) == 2
         for prompt in babylonian_prompts:
-            assert prompt["period"] == "Babylonian"
+            assert prompt["category"] == "Babylonian"
 
-        persian_prompts = prompts.get_prompts_by_period("Persian")
+        persian_prompts = prompts.get_prompts_by_category("Persian")
         assert len(persian_prompts) == 1
         assert persian_prompts[0]["id"] == "2"
 
-        # Test non-existent period
-        empty_prompts = prompts.get_prompts_by_period("NonExistent")
+        # Test non-existent category
+        empty_prompts = prompts.get_prompts_by_category("NonExistent")
         assert len(empty_prompts) == 0
 
     def test_get_prompts_by_topic(self, temp_data_folder):
@@ -181,14 +183,14 @@ $text"""
         assert len(cyrus_prompts) == 1
         assert cyrus_prompts[0]["id"] == "2"
 
-    def test_get_periods(self, temp_data_folder):
-        """Test getting unique periods."""
+    def test_get_categories(self, temp_data_folder):
+        """Test getting unique categories."""
         prompts = Prompts(temp_data_folder)
-        periods = prompts.get_periods()
+        categories = prompts.get_categories()
 
-        assert isinstance(periods, list)
-        assert set(periods) == {"Babylonian", "Persian", "Hellenistic"}
-        assert periods == sorted(periods)  # Should be sorted
+        assert isinstance(categories, list)
+        assert set(categories) == {"Babylonian", "Persian", "Hellenistic"}
+        assert categories == sorted(categories)  # Should be sorted
 
     def test_get_topics(self, temp_data_folder):
         """Test getting unique topics."""
@@ -206,7 +208,7 @@ $text"""
         template = prompts.get_template_content()
 
         assert isinstance(template, str)
-        assert "$period" in template
+        assert "$category" in template
         assert "$topic" in template
         assert "$prompt" in template
         assert "$text" in template
@@ -270,7 +272,7 @@ Another very long line that needs to be wrapped at the appropriate width to ensu
 
         prompt_record = {
             "id": "1",
-            "period": "Babylonian",
+            "category": "Babylonian",
             "topic": "Geopolitical Danger",
             "prompt": "There is an upcoming significant destruction",
         }
@@ -301,7 +303,7 @@ Another very long line that needs to be wrapped at the appropriate width to ensu
         mock_story.verses = ["1:1-1:3"]
 
         # Missing 'prompt' key
-        incomplete_prompt = {"id": "1", "period": "Babylonian", "topic": "Geopolitical Danger"}
+        incomplete_prompt = {"id": "1", "category": "Babylonian", "topic": "Geopolitical Danger"}
 
         with pytest.raises(ValueError, match="Prompt record missing required keys"):
             prompts.populate_template(incomplete_prompt, mock_story, "text")
@@ -318,7 +320,7 @@ Another very long line that needs to be wrapped at the appropriate width to ensu
 
         prompt_record = {
             "id": "1",
-            "period": "Babylonian",
+            "category": "Babylonian",
             "topic": "Geopolitical Danger",
             "prompt": "There is an upcoming significant destruction",
         }
@@ -337,7 +339,7 @@ Another very long line that needs to be wrapped at the appropriate width to ensu
 
         prompt_record = {
             "id": "1",
-            "period": "Babylonian",
+            "category": "Babylonian",
             "topic": "Geopolitical Danger",
             "prompt": "There is an upcoming significant man-made, natural or supernatural destruction by Yahweh that affects the general public and causes great devastation across the land",
         }
@@ -375,9 +377,9 @@ class TestPromptsIntegration:
             count = prompts.get_prompt_count()
             assert count > 0
 
-            periods = prompts.get_periods()
-            assert len(periods) > 0
-            assert all(isinstance(p, str) for p in periods)
+            categories = prompts.get_categories()
+            assert len(categories) > 0
+            assert all(isinstance(p, str) for p in categories)
 
             topics = prompts.get_topics()
             assert len(topics) > 0
@@ -390,7 +392,7 @@ class TestPromptsIntegration:
             if all_prompts:
                 first_prompt = all_prompts[0]
                 assert "id" in first_prompt
-                assert "period" in first_prompt
+                assert "category" in first_prompt
                 assert "topic" in first_prompt
                 assert "prompt" in first_prompt
 
@@ -439,8 +441,8 @@ class TestPromptsIntegration:
             assert len(result) > 0
 
             # Should contain the key elements
-            # XXX the period and topic are not needed in the result, they're for downstream analysis
-            # assert prompt['period'] in result
+            # XXX the category and topic are not needed in the result, they're for downstream analysis
+            # assert prompt['category'] in result
             # assert prompt['topic'] in result
             # Check for the prompt text, accounting for potential line folding
             assert prompt["prompt"] in result.replace("\n", " ")
@@ -469,15 +471,15 @@ class TestPromptsIntegration:
             for prompt in all_prompts:
                 # Should have required keys
                 assert "id" in prompt
-                assert "period" in prompt
+                assert "category" in prompt
                 assert "topic" in prompt
                 assert "prompt" in prompt
 
                 # Values should be non-empty strings
                 assert isinstance(prompt["id"], str)
                 assert len(prompt["id"].strip()) > 0
-                assert isinstance(prompt["period"], str)
-                assert len(prompt["period"].strip()) > 0
+                assert isinstance(prompt["category"], str)
+                assert len(prompt["category"].strip()) > 0
                 assert isinstance(prompt["topic"], str)
                 assert len(prompt["topic"].strip()) > 0
                 assert isinstance(prompt["prompt"], str)
@@ -488,8 +490,8 @@ class TestPromptsIntegration:
             assert len(ids) == len(set(ids)), "Duplicate IDs found"
 
             # Should have reasonable data
-            periods = prompts.get_periods()
-            assert len(periods) >= 1
+            categories = prompts.get_categories()
+            assert len(categories) >= 1
 
             topics = prompts.get_topics()
             assert len(topics) >= 1

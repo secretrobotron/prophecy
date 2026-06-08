@@ -89,13 +89,15 @@ class TestMainCLI:
         with tempfile.TemporaryDirectory() as temp_dir:
             data_path = Path(temp_dir) / "test_data"
             data_path.mkdir()
-            (data_path / "stories.yml").write_text(
+            (data_path / "stories").mkdir()
+            (data_path / "prompts").mkdir()
+            (data_path / "stories" / "stories.yml").write_text(
                 'test_story:\n  book: Genesis\n  verses: ["1:1"]'
             )
-            (data_path / "prompts.tsv").write_text(
-                "id\tprompt\tperiod\ttopic\n1\ttest prompt\ttest\ttest"
+            (data_path / "prompts" / "prompts.tsv").write_text(
+                "id\tprompt\tcategory\ttopic\n1\ttest prompt\ttest\ttest"
             )
-            (data_path / "template.txt").write_text("Test template")
+            (data_path / "prompts" / "template.txt").write_text("Test template")
             (data_path / "index.json").write_text("{}")
 
             with patch.dict(os.environ, {"PROPHECY_DATA_FOLDER": str(data_path)}, clear=False):

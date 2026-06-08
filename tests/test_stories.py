@@ -22,19 +22,20 @@ class TestStories:
 
     @pytest.fixture
     def temp_data_folder(self):
-        """Create a temporary data folder with test stories.yml."""
+        """Create a temporary data folder with test data/stories/stories.yml."""
         with tempfile.TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir) / "data"
             data_dir.mkdir()
+            stories_dir = data_dir / "stories"
+            stories_dir.mkdir()
 
-            # Create test stories.yml
             stories_data = {
                 "The Creation": {"book": "Genesis", "verses": ["1:1-2:7"]},
                 "Adam and Eve": {"book": "Genesis", "verses": ["2:8-3:24"]},
                 "Complex Story": {"book": "Genesis", "verses": ["1:1-1:3", "2:1-2:3"]},
             }
 
-            with open(data_dir / "stories.yml", "w") as f:
+            with open(stories_dir / "stories.yml", "w") as f:
                 yaml.dump(stories_data, f, default_flow_style=False)
 
             yield str(data_dir)
@@ -74,20 +75,90 @@ class TestStories:
 
     def test_init_missing_stories_file(self, temp_data_folder):
         """Test Stories initialization with missing stories.yml."""
-        os.remove(Path(temp_data_folder) / "stories.yml")
+        os.remove(Path(temp_data_folder) / "stories" / "stories.yml")
         with pytest.raises(FileNotFoundError, match="Stories file not found"):
             Stories(temp_data_folder)
 
     def test_init_invalid_yaml_format(self, temp_data_folder):
         """Test Stories initialization with invalid YAML format."""
-        stories_path = Path(temp_data_folder) / "stories.yml"
+        stories_path = Path(temp_data_folder) / "stories" / "stories.yml"
 
         # Write invalid YAML (list instead of dict at root)
         with open(stories_path, "w") as f:
             yaml.dump(["invalid", "format"], f)
 
-        with pytest.raises(ValueError, match="Invalid stories.yml format"):
+        with pytest.raises(ValueError, match="Invalid stories file format"):
             Stories(temp_data_folder)
+
+    def test_init_with_alternative_stories_file(self, temp_data_folder):
+        """An explicit stories_file overrides the default stories.yml."""
+        alt_path = Path(temp_data_folder) / "stories" / "stories-alt.yml"
+        with open(alt_path, "w") as f:
+            yaml.dump(
+                {"Alt Story": {"book": "Genesis", "verses": ["1:1-1:1"]}},
+                f,
+                default_flow_style=False,
+            )
+
+        stories = Stories(data_folder=temp_data_folder, stories_file="stories-alt.yml")
+        assert stories.titles == ["Alt Story"]
+        assert stories.stories_path == alt_path
+
+    def test_unquoted_single_verse_refs_are_strings(self, temp_data_folder):
+        """PyYAML's sexagesimal int parsing is disabled — `- 1:7` stays a string.
+
+        Without the custom loader, ``- 1:7`` parses as the integer 67 (YAML
+        1.1 base-60). With the loader, every verse entry stays a string and
+        the Story validation passes without requiring quotes.
+        """
+        stories_path = Path(temp_data_folder) / "stories" / "stories.yml"
+        # Block-style scalars, no quotes — the historically dangerous form.
+        stories_path.write_text(
+            "Mountain Meeting:\n  book: Exodus\n  verses:\n    - 3:1\n    - 3:4\n    - 3:9-3:15\n",
+            encoding="utf-8",
+        )
+
+        stories = Stories(temp_data_folder)
+        verses = stories.get_story("Mountain Meeting").verses
+        assert verses == ["3:1", "3:4", "3:9-3:15"]
+        assert all(isinstance(v, str) for v in verses)
+
+    def test_init_with_custom_stories_folder(self, temp_data_folder):
+        """An explicit stories_folder overrides the default 'stories' subdir."""
+        custom = Path(temp_data_folder) / "catalogs"
+        custom.mkdir()
+        (custom / "stories.yml").write_text(
+            yaml.dump({"Custom": {"book": "Genesis", "verses": ["1:1-1:1"]}})
+        )
+
+        stories = Stories(data_folder=temp_data_folder, stories_folder="catalogs")
+        assert stories.titles == ["Custom"]
+        assert stories.stories_path == custom / "stories.yml"
+
+    def test_init_with_absolute_stories_path(self, temp_data_folder, tmp_path):
+        """Absolute stories_file path is used as-is, ignoring data_folder."""
+        elsewhere = tmp_path / "elsewhere.yml"
+        elsewhere.write_text(yaml.dump({"Elsewhere": {"book": "Genesis", "verses": ["1:1-1:1"]}}))
+
+        stories = Stories(data_folder=temp_data_folder, stories_file=str(elsewhere))
+        assert stories.titles == ["Elsewhere"]
+        assert stories.stories_path == elsewhere
+
+    def test_init_stories_file_from_settings(self, temp_data_folder, monkeypatch):
+        """When stories_file kwarg is omitted, Settings provides it."""
+        alt_path = Path(temp_data_folder) / "stories" / "stories-from-env.yml"
+        with open(alt_path, "w") as f:
+            yaml.dump(
+                {"Env Story": {"book": "Genesis", "verses": ["1:1-1:1"]}},
+                f,
+                default_flow_style=False,
+            )
+
+        monkeypatch.setenv("PROPHECY_STORIES_FILE", "stories-from-env.yml")
+        # Defensively clear data folder env so the temp path is what's used.
+        monkeypatch.delenv("PROPHECY_DATA_FOLDER", raising=False)
+        stories = Stories(data_folder=temp_data_folder)
+        assert stories.titles == ["Env Story"]
 
     def test_titles_property(self, temp_data_folder):
         """Test the titles property returns sorted list."""
@@ -164,6 +235,36 @@ class TestStory:
         }
         with pytest.raises(ValueError, match="Story 'Test' verses field must be a list"):
             Story("Test", story_data)
+
+    def test_sources_defaults_to_empty(self):
+        """Stories without an explicit sources field expose an empty list."""
+        story = Story("Test", {"book": "Genesis", "verses": ["1:1-1:1"]})
+        assert story.sources == []
+
+    def test_sources_round_trip(self):
+        """A sources list in story data is exposed verbatim and is a copy."""
+        story = Story(
+            "Tagged",
+            {"book": "Exodus", "verses": ["1:15-1:22"], "sources": ["E", "P"]},
+        )
+        assert story.sources == ["E", "P"]
+        # Mutating the returned list must not affect internal state.
+        story.sources.append("J")
+        assert story.sources == ["E", "P"]
+
+    def test_sources_must_be_list(self):
+        with pytest.raises(ValueError, match="sources field must be a list"):
+            Story(
+                "Bad",
+                {"book": "Genesis", "verses": ["1:1-1:1"], "sources": "E"},
+            )
+
+    def test_sources_entries_must_be_strings(self):
+        with pytest.raises(ValueError, match="sources entries must be strings"):
+            Story(
+                "Bad",
+                {"book": "Genesis", "verses": ["1:1-1:1"], "sources": ["E", 42]},
+            )
 
     def test_properties(self):
         """Test Story properties."""

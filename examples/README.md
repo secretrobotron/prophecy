@@ -52,7 +52,7 @@ Shows how to use the structured prompts system for biblical text analysis.
 
 **Features demonstrated:**
 - Loading prompts from `data/prompts.tsv`
-- Filtering prompts by period and topic
+- Filtering prompts by category and topic
 - Applying prompts to biblical texts
 - Structured analysis workflows
 

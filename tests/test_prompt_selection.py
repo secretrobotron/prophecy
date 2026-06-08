@@ -1,5 +1,5 @@
 """
-Tests for --period/--topic prompt selection, --concatenate bundling,
+Tests for --category/--topic prompt selection, --concatenate bundling,
 and the `query` subcommand.
 """
 
@@ -32,9 +32,11 @@ def data_folder():
     with tempfile.TemporaryDirectory() as tmp:
         data = Path(tmp) / "data"
         data.mkdir()
+        (data / "prompts").mkdir()
+        (data / "stories").mkdir()
 
-        (data / "prompts.tsv").write_text(
-            "id\tperiod\ttopic\tprompt\n"
+        (data / "prompts" / "prompts.tsv").write_text(
+            "id\tcategory\ttopic\tprompt\n"
             "1\tBabylonian\tGeo\tThere is destruction\n"
             "2\tBabylonian\tGeo\tThere is famine\n"
             "3\tPolitics\tPopulism\tThe people make decisions\n"
@@ -42,8 +44,8 @@ def data_folder():
             "5\tPolitics\tElitism\tThe leaders rage at the people\n",
             encoding="utf-8",
         )
-        (data / "template.txt").write_text('"$prompt"\n\n"$text"\n', encoding="utf-8")
-        (data / "stories.yml").write_text(
+        (data / "prompts" / "template.txt").write_text('"$prompt"\n\n"$text"\n', encoding="utf-8")
+        (data / "stories" / "stories.yml").write_text(
             "Sample Story:\n  book: Genesis\n  verses: ['1:1']\n"
             "Exodus Story:\n  book: Exodus\n  verses: ['1:1']\n"
             "Another Genesis Story:\n  book: Genesis\n  verses: ['2:1']\n",
@@ -59,13 +61,13 @@ class TestSelectPrompts:
         result = select_prompts(prompts, "all", None, None)
         assert len(result) == 5
 
-    def test_period_filter(self, data_folder):
+    def test_category_filter(self, data_folder):
         prompts = Prompts(data_folder=data_folder)
         result = select_prompts(prompts, "all", "Politics", None)
         assert len(result) == 3
-        assert all(p["period"] == "Politics" for p in result)
+        assert all(p["category"] == "Politics" for p in result)
 
-    def test_period_and_topic_filter(self, data_folder):
+    def test_category_and_topic_filter(self, data_folder):
         prompts = Prompts(data_folder=data_folder)
         result = select_prompts(prompts, "all", "Politics", "Populism")
         assert len(result) == 2
@@ -83,14 +85,14 @@ class TestSelectPrompts:
         assert len(result) == 1
         assert result[0]["id"] == "2"
 
-    def test_specific_prompt_with_period_rejected(self, data_folder):
+    def test_specific_prompt_with_category_rejected(self, data_folder):
         prompts = Prompts(data_folder=data_folder)
         with pytest.raises(ValueError, match="cannot be combined"):
             select_prompts(prompts, "1", "Politics", None)
 
-    def test_unknown_period_rejected(self, data_folder):
+    def test_unknown_category_rejected(self, data_folder):
         prompts = Prompts(data_folder=data_folder)
-        with pytest.raises(ValueError, match="Period 'Nope' not found"):
+        with pytest.raises(ValueError, match="Category 'Nope' not found"):
             select_prompts(prompts, "all", "Nope", None)
 
     def test_unknown_topic_rejected(self, data_folder):
@@ -109,7 +111,7 @@ class TestSelectPrompts:
         result = select_prompts(prompts, "all", None, ["Populism", "Elitism"])
         assert {p["id"] for p in result} == {"3", "4", "5"}
 
-    def test_multiple_periods_via_list(self, data_folder):
+    def test_multiple_categories_via_list(self, data_folder):
         prompts = Prompts(data_folder=data_folder)
         result = select_prompts(prompts, "all", ["Politics", "Babylonian"], None)
         assert {p["id"] for p in result} == {"1", "2", "3", "4", "5"}
@@ -180,10 +182,10 @@ class TestNormalizeKnown:
 
 
 class TestCaseInsensitiveSelectors:
-    def test_select_prompts_period_lowercase(self, data_folder):
+    def test_select_prompts_category_lowercase(self, data_folder):
         prompts = Prompts(data_folder=data_folder)
         result = select_prompts(prompts, "all", "politics", None)
-        assert all(p["period"] == "Politics" for p in result)
+        assert all(p["category"] == "Politics" for p in result)
 
     def test_select_prompts_topic_uppercase(self, data_folder):
         prompts = Prompts(data_folder=data_folder)
@@ -231,12 +233,12 @@ class TestParseMultiValue:
 class TestBuildConcatenatedPrompt:
     def test_synthetic_id_uses_filter_labels(self):
         records = [
-            {"id": "3", "period": "Politics", "topic": "Populism", "prompt": "A"},
-            {"id": "4", "period": "Politics", "topic": "Populism", "prompt": "B"},
+            {"id": "3", "category": "Politics", "topic": "Populism", "prompt": "A"},
+            {"id": "4", "category": "Politics", "topic": "Populism", "prompt": "B"},
         ]
         combined = build_concatenated_prompt(records, "Politics", "Populism")
         assert combined["id"] == "concat:Politics:Populism"
-        assert combined["period"] == "Politics"
+        assert combined["category"] == "Politics"
         assert combined["topic"] == "Populism"
         assert "1. A" in combined["prompt"]
         assert "2. B" in combined["prompt"]
@@ -244,19 +246,19 @@ class TestBuildConcatenatedPrompt:
 
     def test_unset_filters_fall_back_to_uniform_record_metadata(self):
         records = [
-            {"id": "1", "period": "Babylonian", "topic": "Geo", "prompt": "X"},
-            {"id": "2", "period": "Babylonian", "topic": "Geo", "prompt": "Y"},
+            {"id": "1", "category": "Babylonian", "topic": "Geo", "prompt": "X"},
+            {"id": "2", "category": "Babylonian", "topic": "Geo", "prompt": "Y"},
         ]
         combined = build_concatenated_prompt(records, None, None)
         assert combined["id"] == "concat:Babylonian:Geo"
 
-    def test_mixed_periods_use_all_label(self):
+    def test_mixed_categories_use_all_label(self):
         records = [
-            {"id": "1", "period": "Babylonian", "topic": "Geo", "prompt": "X"},
-            {"id": "3", "period": "Politics", "topic": "Populism", "prompt": "Y"},
+            {"id": "1", "category": "Babylonian", "topic": "Geo", "prompt": "X"},
+            {"id": "3", "category": "Politics", "topic": "Populism", "prompt": "Y"},
         ]
         combined = build_concatenated_prompt(records, None, None)
-        assert combined["period"] == "all"
+        assert combined["category"] == "all"
         assert combined["topic"] == "all"
         assert combined["id"] == "concat:all:all"
 
@@ -266,8 +268,8 @@ class TestBuildConcatenatedPrompt:
 
     def test_list_topic_joined_with_plus(self):
         records = [
-            {"id": "3", "period": "Politics", "topic": "Populism", "prompt": "A"},
-            {"id": "5", "period": "Politics", "topic": "Elitism", "prompt": "B"},
+            {"id": "3", "category": "Politics", "topic": "Populism", "prompt": "A"},
+            {"id": "5", "category": "Politics", "topic": "Elitism", "prompt": "B"},
         ]
         combined = build_concatenated_prompt(records, "Politics", ["Populism", "Elitism"])
         assert combined["topic"] == "Populism+Elitism"
@@ -293,7 +295,7 @@ class TestQueryCommand:
         )
 
         with patch.dict(os.environ, {"PROPHECY_DATA_FOLDER": str(data_folder)}, clear=False):
-            rc = query_command(["--period", "Politics", "--format", "json"])
+            rc = query_command(["--category", "Politics", "--format", "json"])
         assert rc == 0
         out = capsys.readouterr().out
         rows = json.loads(out)
@@ -352,11 +354,11 @@ class TestQueryCommand:
             ],
         )
         with patch.dict(os.environ, {"PROPHECY_DATA_FOLDER": str(data_folder)}, clear=False):
-            rc = query_command(["--period", "Politics", "--format", "json"])
+            rc = query_command(["--category", "Politics", "--format", "json"])
         assert rc == 0
         rows = json.loads(capsys.readouterr().out)
         assert len(rows) == 1
-        assert rows[0]["period"] == "Politics"
+        assert rows[0]["category"] == "Politics"
         assert rows[0]["topic"] == "Populism"
 
     def test_query_multiple_topics(self, data_folder, capsys):
@@ -432,11 +434,11 @@ class TestQueryCommand:
             rc = query_command(["--format", "json"])
         assert rc == 0
         rows = json.loads(capsys.readouterr().out)
-        # Same (story, period, topic) but two engines → two rows
+        # Same (story, category, topic) but two engines → two rows
         engines = {r["engine"] for r in rows}
         assert engines == {"chatgpt:gpt-4", "claude:claude-3-haiku-20240307"}
 
-    def test_query_period_case_insensitive(self, data_folder, capsys):
+    def test_query_category_case_insensitive(self, data_folder, capsys):
         cache = data_folder / "results"
         self._write_results(
             cache,
@@ -445,11 +447,11 @@ class TestQueryCommand:
             ],
         )
         with patch.dict(os.environ, {"PROPHECY_DATA_FOLDER": str(data_folder)}, clear=False):
-            rc = query_command(["--period", "politics", "--format", "json"])
+            rc = query_command(["--category", "politics", "--format", "json"])
         assert rc == 0
         rows = json.loads(capsys.readouterr().out)
         assert len(rows) == 1
-        assert rows[0]["period"] == "Politics"
+        assert rows[0]["category"] == "Politics"
 
     def test_query_unknown_book_errors(self, data_folder, capsys):
         with patch.dict(os.environ, {"PROPHECY_DATA_FOLDER": str(data_folder)}, clear=False):
@@ -479,7 +481,7 @@ class TestQueryCommand:
         args.ai_provider = "stub"
         args.workers = 4
         args.concatenate = False
-        args.period = None
+        args.category = None
         args.topic = None
 
         settings = Settings(data_folder=data_folder, cache_folder=tmp_path / "results")
@@ -527,7 +529,7 @@ class TestQueryCommand:
         assert rc == 0
         lines = capsys.readouterr().out.strip().split("\n")
         assert lines[0] == (
-            "story\tbook\tperiod\ttopic\tengine\thits\ttotal\thit_rate\tavg_certainty"
+            "story\tbook\tcategory\ttopic\tengine\thits\ttotal\thit_rate\tavg_certainty"
         )
         assert len(lines) == 2
         assert lines[1].startswith("Sample Story\tGenesis\tPolitics\tPopulism\tunknown\t1\t1\t")

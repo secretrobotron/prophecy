@@ -176,7 +176,6 @@ class TestBible:
         bible = Bible(temp_data_folder)
 
         invalid_ranges = [
-            "1:1",  # Missing end
             "1:1-2",  # Missing verse in end
             "invalid",  # Completely invalid
             "1:1-2:",  # Missing end verse
@@ -187,6 +186,15 @@ class TestBible:
         for invalid_range in invalid_ranges:
             with pytest.raises(ValueError, match="Invalid verse range format"):
                 bible._parse_verse_range(invalid_range)
+
+    def test_parse_verse_range_single_verse_shorthand(self, temp_data_folder):
+        """A bare chapter:verse is treated as a zero-length range at that verse."""
+        bible = Bible(temp_data_folder)
+        assert bible._parse_verse_range("1:7") == ((1, 7), (1, 7))
+        # And it round-trips through get_text the same as the explicit range.
+        assert bible.get_text("Genesis", {"range": "1:1"}) == bible.get_text(
+            "Genesis", {"range": "1:1-1:1"}
+        )
 
     def test_get_text_single_verse(self, temp_data_folder):
         """Test extracting text for a single verse."""

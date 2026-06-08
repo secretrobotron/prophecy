@@ -99,7 +99,7 @@ def demonstrate_integration_with_prophecy():
         print(f"Text length: {len(biblical_text)} characters")
 
         print(f"\n--- Using Prompt #{prompt_data['id']} ---")
-        print(f"Period: {prompt_data['period']}")
+        print(f"Category: {prompt_data['category']}")
         print(f"Topic: {prompt_data['topic']}")
         print(f"Prompt: {prompt_data['prompt'][:100]}...")
 

@@ -29,6 +29,19 @@ class Settings:
 
     data_folder: Path = Path("data")
     cache_folder: Path | None = None
+    # Curated input lives in topical subfolders so the data root stays
+    # uncluttered: data/stories/*.yml and data/prompts/{prompts*.tsv,template.txt}.
+    stories_folder: Path = Path("stories")
+    stories_file: Path = Path("stories.yml")
+    prompts_folder: Path = Path("prompts")
+    # Where `prophecy export` writes its static bundle by default. Independent
+    # of data_folder because the export is consumed by the viewer / a static
+    # site, not by the pipeline itself.
+    export_out_folder: Path = Path("dist/data")
+    # Default to a small pool: AI calls are independent (no cross-prompt
+    # contamination) and the per-call cost is dominated by network/subprocess
+    # latency, so a handful of parallel workers buys a lot of wall-clock back.
+    workers: int = 3
 
     def __post_init__(self) -> None:
         # Coerce strings (from TOML or env) to Path so consumers can rely
@@ -37,12 +50,51 @@ class Settings:
             self.data_folder = Path(self.data_folder)
         if isinstance(self.cache_folder, str):
             self.cache_folder = Path(self.cache_folder)
+        if isinstance(self.stories_folder, str):
+            self.stories_folder = Path(self.stories_folder)
+        if isinstance(self.stories_file, str):
+            self.stories_file = Path(self.stories_file)
+        if isinstance(self.prompts_folder, str):
+            self.prompts_folder = Path(self.prompts_folder)
+        if isinstance(self.export_out_folder, str):
+            self.export_out_folder = Path(self.export_out_folder)
+        # Env vars arrive as strings; TOML/kwarg ints come through untouched.
+        if isinstance(self.workers, str):
+            try:
+                self.workers = int(self.workers)
+            except ValueError as e:
+                raise ValueError(f"workers must be an integer, got {self.workers!r}") from e
+        if self.workers < 1:
+            raise ValueError(f"workers must be >= 1, got {self.workers}")
 
     def resolve_cache_folder(self) -> Path:
         """Cache folder if set explicitly; otherwise ``data_folder / "results"``."""
         if self.cache_folder is not None:
             return self.cache_folder
         return self.data_folder / "results"
+
+    def resolve_stories_folder(self) -> Path:
+        """Stories folder resolved against ``data_folder`` if relative."""
+        if self.stories_folder.is_absolute():
+            return self.stories_folder
+        return self.data_folder / self.stories_folder
+
+    def resolve_stories_path(self) -> Path:
+        """
+        Stories file resolved against the stories folder.
+
+        Absolute ``stories_file`` short-circuits both folders so a one-off
+        catalog outside the data tree still works.
+        """
+        if self.stories_file.is_absolute():
+            return self.stories_file
+        return self.resolve_stories_folder() / self.stories_file
+
+    def resolve_prompts_folder(self) -> Path:
+        """Prompts folder resolved against ``data_folder`` if relative."""
+        if self.prompts_folder.is_absolute():
+            return self.prompts_folder
+        return self.data_folder / self.prompts_folder
 
     @classmethod
     def load(cls, *, config_path: Path | None = None, **overrides: Any) -> Settings:

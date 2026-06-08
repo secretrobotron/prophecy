@@ -33,7 +33,7 @@ Tests for AI provider integration:
 #### test_prompts_class.py
 Tests for the Prompts class:
 - Prompts loading from TSV files
-- Filtering by topic and period
+- Filtering by topic and category
 - Data structure validation
 - Integration with AI providers
 
@@ -79,7 +79,7 @@ Validation of `data/prompts.tsv` structure and content:
    - Consistent column count across all rows
 
 2. **Header Validation**
-   - Headers are exactly: `id`, `period`, `topic`, `prompt`
+   - Headers are exactly: `id`, `category`, `topic`, `prompt`
    - Headers are in correct order
 
 3. **Data Integrity**

@@ -21,32 +21,49 @@ class Prompts:
     for reading prompts and populating templates with prompts and Story objects.
     """
 
-    def __init__(self, data_folder: str | Path | None = None):
+    def __init__(
+        self,
+        data_folder: str | Path | None = None,
+        prompts_folder: str | Path | None = None,
+    ):
         """
         Initialize the Prompts class.
 
         Args:
-            data_folder: Path to the data folder containing prompts.tsv and
-                template.txt. If None, falls back to ``Settings.load()``,
-                which layers prophecy.toml, the PROPHECY_DATA_FOLDER env
-                var, and the dataclass default ('data').
+            data_folder: Path to the data folder. If None, falls back to
+                ``Settings.load()``.
+            prompts_folder: Subfolder under ``data_folder`` containing
+                ``prompts.tsv`` (required), any number of auxiliary
+                ``prompts.<name>.tsv`` files, and ``template.txt``.
+                Default ``prompts``. If None, falls back to
+                ``Settings.load().prompts_folder``.
+
+        Auxiliary prompt files let contributors keep topical prompt sets
+        (e.g. ``prompts.politics.tsv``) in their own files. All matching
+        ``prompts*.tsv`` files are merged on load, with IDs required to be
+        globally unique across the set.
         """
-        if data_folder is None:
-            data_folder = Settings.load().data_folder
+        settings = Settings.load(
+            data_folder=data_folder,
+            prompts_folder=prompts_folder,
+        )
+        self.data_folder = settings.data_folder
+        self.prompts_folder = settings.resolve_prompts_folder()
 
-        self.data_folder = Path(data_folder)
-
-        # Validate data folder exists
         if not self.data_folder.exists():
             raise FileNotFoundError(f"Data folder not found: {self.data_folder}")
+        if not self.prompts_folder.exists():
+            raise FileNotFoundError(f"Prompts folder not found: {self.prompts_folder}")
 
-        # Load the prompts.tsv file
-        self.prompts_path = self.data_folder / "prompts.tsv"
+        # The main prompts.tsv is required; auxiliary prompts.<name>.tsv
+        # files are picked up automatically when present.
+        self.prompts_path = self.prompts_folder / "prompts.tsv"
         if not self.prompts_path.exists():
             raise FileNotFoundError(f"Prompts file not found: {self.prompts_path}")
+        self.prompts_paths: list[Path] = self._discover_prompt_files()
 
         # Load the template.txt file
-        self.template_path = self.data_folder / "template.txt"
+        self.template_path = self.prompts_folder / "template.txt"
         if not self.template_path.exists():
             raise FileNotFoundError(f"Template file not found: {self.template_path}")
 
@@ -58,21 +75,41 @@ class Prompts:
         with open(self.template_path, encoding="utf-8") as f:
             self._template_content = f.read()
 
-    def _load_prompts(self):
-        """Load prompts data from the TSV file."""
-        with open(self.prompts_path, encoding="utf-8") as f:
-            reader = csv.DictReader(f, delimiter="\t")
-            self._prompts_data = list(reader)
+    def _discover_prompt_files(self) -> list[Path]:
+        """Return the main prompts.tsv first, then auxiliary prompts.*.tsv files sorted by name."""
+        aux = sorted(p for p in self.prompts_folder.glob("prompts.*.tsv") if p != self.prompts_path)
+        return [self.prompts_path, *aux]
 
-        if not self._prompts_data:
-            raise ValueError(f"No prompts data found in {self.prompts_path}")
+    def _load_prompts(self):
+        """Load and merge prompts data from every discovered TSV, enforcing global ID uniqueness."""
+        merged: list[dict[str, str]] = []
+        id_origin: dict[str, Path] = {}
+        for path in self.prompts_paths:
+            with open(path, encoding="utf-8") as f:
+                reader = csv.DictReader(f, delimiter="\t")
+                rows = list(reader)
+            for row in rows:
+                prompt_id = row.get("id", "")
+                if prompt_id in id_origin:
+                    raise ValueError(
+                        f"Duplicate prompt id '{prompt_id}' in {path} "
+                        f"(already defined in {id_origin[prompt_id]})"
+                    )
+                id_origin[prompt_id] = path
+                merged.append(row)
+
+        if not merged:
+            raise ValueError(
+                f"No prompts data found in {', '.join(str(p) for p in self.prompts_paths)}"
+            )
+        self._prompts_data = merged
 
     def get_prompts(self) -> list[dict[str, str]]:
         """
         Get all prompts data.
 
         Returns:
-            List of dictionaries, each containing 'id', 'period', 'topic', 'prompt' keys
+            List of dictionaries, each containing 'id', 'category', 'topic', 'prompt' keys
         """
         return [prompt.copy() for prompt in self._prompts_data]
 
@@ -85,7 +122,7 @@ class Prompts:
                 ``int`` — int values are stringified before lookup.
 
         Returns:
-            Dictionary containing 'id', 'period', 'topic', 'prompt' keys
+            Dictionary containing 'id', 'category', 'topic', 'prompt' keys
 
         Raises:
             ValueError: If the prompt ID is not found
@@ -99,17 +136,17 @@ class Prompts:
             f"Prompt ID '{prompt_id}' not found. Available IDs: {', '.join(available_ids[:10])}..."
         )
 
-    def get_prompts_by_period(self, period: str) -> list[dict[str, str]]:
+    def get_prompts_by_category(self, category: str) -> list[dict[str, str]]:
         """
-        Get all prompts for a specific period.
+        Get all prompts for a specific category.
 
         Args:
-            period: The period to filter by (e.g., 'Babylonian', 'Persian', 'Hellenistic')
+            category: The category to filter by (e.g., 'Babylonian', 'Persian', 'Hellenistic')
 
         Returns:
-            List of prompt dictionaries matching the period
+            List of prompt dictionaries matching the category
         """
-        return [prompt.copy() for prompt in self._prompts_data if prompt["period"] == period]
+        return [prompt.copy() for prompt in self._prompts_data if prompt["category"] == category]
 
     def get_prompts_by_topic(self, topic: str) -> list[dict[str, str]]:
         """
@@ -125,41 +162,41 @@ class Prompts:
 
     def filter(
         self,
-        period: str | list[str] | None = None,
+        category: str | list[str] | None = None,
         topic: str | list[str] | None = None,
     ) -> list[dict[str, str]]:
         """
-        Get prompts narrowed by period and/or topic.
+        Get prompts narrowed by category and/or topic.
 
         Args:
-            period: If set, keep only prompts whose period matches. May be a
+            category: If set, keep only prompts whose category matches. May be a
                 single string or a list of strings (any-of match).
             topic: If set, keep only prompts whose topic matches. Same shape
-                rules as ``period``.
+                rules as ``category``.
 
         Returns:
             List of prompt dictionaries matching the filters (intersection
-            across period and topic, any-of within each filter).
+            across category and topic, any-of within each filter).
             With no filters set, returns all prompts.
         """
         results = [prompt.copy() for prompt in self._prompts_data]
-        if period is not None:
-            period_set = {period} if isinstance(period, str) else set(period)
-            results = [p for p in results if p["period"] in period_set]
+        if category is not None:
+            category_set = {category} if isinstance(category, str) else set(category)
+            results = [p for p in results if p["category"] in category_set]
         if topic is not None:
             topic_set = {topic} if isinstance(topic, str) else set(topic)
             results = [p for p in results if p["topic"] in topic_set]
         return results
 
-    def get_periods(self) -> list[str]:
+    def get_categories(self) -> list[str]:
         """
-        Get all unique periods in the prompts data.
+        Get all unique categories in the prompts data.
 
         Returns:
-            Sorted list of unique periods
+            Sorted list of unique categories
         """
-        periods = set(prompt["period"] for prompt in self._prompts_data)
-        return sorted(periods)
+        categories = set(prompt["category"] for prompt in self._prompts_data)
+        return sorted(categories)
 
     def get_topics(self) -> list[str]:
         """
@@ -202,7 +239,7 @@ class Prompts:
         Populate the template with a prompt record, story object, and text.
 
         Args:
-            prompt_record: Dictionary containing prompt data with 'id', 'period', 'topic', 'prompt' keys
+            prompt_record: Dictionary containing prompt data with 'id', 'category', 'topic', 'prompt' keys
             story_object: Story object with title, book, and verses properties
             text: The biblical text content
 
@@ -214,7 +251,7 @@ class Prompts:
             AttributeError: If story_object is missing required attributes
         """
         # Validate prompt_record
-        required_keys = {"id", "period", "topic", "prompt"}
+        required_keys = {"id", "category", "topic", "prompt"}
         missing_keys = required_keys - set(prompt_record.keys())
         if missing_keys:
             raise ValueError(f"Prompt record missing required keys: {missing_keys}")
@@ -232,7 +269,7 @@ class Prompts:
 
         # Prepare template variables
         template_vars = {
-            "period": prompt_record["period"],
+            "category": prompt_record["category"],
             "topic": prompt_record["topic"],
             "prompt": prompt_record["prompt"],
             "text": text,

@@ -88,8 +88,11 @@ class Bible:
         """
         Parse a verse range string into start and end chapter:verse pairs.
 
-        Args:
-            verse_range: String in format "start_chapter:start_verse-end_chapter:end_verse"
+        Accepts either a full range ("start_chapter:start_verse-end_chapter:end_verse")
+        or a single verse ("chapter:verse"), which is treated as a zero-length
+        range pointing at that one verse. Single-verse refs are common in
+        documentary-source catalogs where a story cherry-picks individual
+        verses out of a chapter.
 
         Returns:
             Tuple of ((start_chapter, start_verse), (end_chapter, end_verse))
@@ -97,16 +100,21 @@ class Bible:
         Raises:
             ValueError: If the verse range format is invalid
         """
-        pattern = r"^(\d+):(\d+)-(\d+):(\d+)$"
-        match = re.match(pattern, verse_range.strip())
+        cleaned = verse_range.strip()
+        full_match = re.match(r"^(\d+):(\d+)-(\d+):(\d+)$", cleaned)
+        if full_match:
+            sc, sv, ec, ev = full_match.groups()
+            return ((int(sc), int(sv)), (int(ec), int(ev)))
 
-        if not match:
-            raise ValueError(
-                f"Invalid verse range format: '{verse_range}'. Expected format: 'chapter:verse-chapter:verse'"
-            )
+        single_match = re.match(r"^(\d+):(\d+)$", cleaned)
+        if single_match:
+            c, v = single_match.groups()
+            return ((int(c), int(v)), (int(c), int(v)))
 
-        start_chapter, start_verse, end_chapter, end_verse = match.groups()
-        return ((int(start_chapter), int(start_verse)), (int(end_chapter), int(end_verse)))
+        raise ValueError(
+            f"Invalid verse range format: '{verse_range}'. "
+            "Expected 'chapter:verse-chapter:verse' or 'chapter:verse'"
+        )
 
     def _extract_text_from_range(self, book_data: dict, start: tuple, end: tuple) -> str:
         """

@@ -9,6 +9,20 @@
   --true: #2f855a;
   --false: #c53030;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Soft category palette — muted pastels, override per-category as needed. */
+  --cat-babylonian: #d6e6f2;
+  --cat-babylonian-text: #2e5879;
+  --cat-hellenistic: #f0e3cf;
+  --cat-hellenistic-text: #7a5a2e;
+  --cat-persian: #e1d6ec;
+  --cat-persian-text: #5a3e7a;
+  --cat-politics: #d8e8d3;
+  --cat-politics-text: #3f6635;
+  --cat-test: #e2e4e8;
+  --cat-test-text: #5a5e66;
+  --cat-default: #ececec;
+  --cat-default-text: #525252;
 }
 
 * { box-sizing: border-box; }
@@ -276,4 +290,828 @@ footer {
   border-top: 1px solid var(--border);
   font-size: 11px;
   color: var(--muted);
+}
+
+/* Labels tab: tree (left) + pane (right). */
+.labels-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 20px;
+  min-height: 600px;
+}
+
+.labels-tree {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow-y: auto;
+  max-height: calc(100vh - 180px);
+  padding: 8px 6px;
+  font-size: 13px;
+}
+
+.tree-root {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tree-book {
+  margin: 0;
+}
+
+.tree-book-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-weight: 600;
+  user-select: none;
+}
+
+.tree-book-title:hover {
+  background: var(--row-hover);
+}
+
+.tree-book.active > .tree-book-title {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.tree-book-chevron {
+  font-size: 10px;
+  color: var(--muted);
+  display: inline-block;
+  width: 10px;
+  transition: transform 0.15s ease;
+}
+
+.tree-book.expanded > .tree-book-title .tree-book-chevron {
+  transform: rotate(90deg);
+}
+
+.tree-story-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 4px 22px;
+  display: none;
+}
+
+.tree-book.expanded > .tree-story-list {
+  display: block;
+}
+
+.tree-story {
+  padding: 3px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--fg);
+  font-weight: 400;
+}
+
+.tree-story:hover {
+  background: var(--row-hover);
+}
+
+.tree-story.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.labels-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.labels-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.labels-toolbar-filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+#labels-pane-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.labels-engine-pick {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  color: var(--muted);
+  gap: 4px;
+}
+
+.labels-engine-pick select {
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: white;
+  min-width: 200px;
+}
+
+.labels-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  align-self: end;
+  padding-bottom: 4px;
+}
+
+#labels-pane-body {
+  min-width: 0;
+}
+
+/* Book-grid view (no specific story selected): one row per story with chips. */
+.story-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.story-grid-row {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 16px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: white;
+  align-items: center;
+  cursor: pointer;
+}
+
+.story-grid-row:hover {
+  background: var(--row-hover);
+}
+
+.story-grid-name {
+  font-weight: 600;
+}
+
+.story-grid-name .story-meta {
+  display: block;
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.story-grid-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+
+.label-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 11px;
+  font-size: 12px;
+  line-height: 1.5;
+  background: var(--cat-default);
+  color: var(--cat-default-text);
+}
+
+.label-chip[data-category="Babylonian"]   { background: var(--cat-babylonian);   color: var(--cat-babylonian-text); }
+.label-chip[data-category="Hellenistic"]  { background: var(--cat-hellenistic);  color: var(--cat-hellenistic-text); }
+.label-chip[data-category="Persian"]      { background: var(--cat-persian);      color: var(--cat-persian-text); }
+.label-chip[data-category="Politics"]     { background: var(--cat-politics);     color: var(--cat-politics-text); }
+.label-chip[data-category="Test"]         { background: var(--cat-test);         color: var(--cat-test-text); }
+
+.label-chip-score {
+  font-family: var(--mono);
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+/* Same color family as the attributed chip but stripped of fill so the eye
+   can ignore them when scanning for attributed ones. */
+.label-chip-unattributed {
+  background: transparent !important;
+  color: var(--muted) !important;
+  border: 1px dashed var(--border);
+}
+
+/* Source chips (E, P, J, …) — visually distinct from category chips so the
+   cataloguing tags don't read as derived labels. */
+.source-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 11px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  background: transparent;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+}
+
+.source-chip-row {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* Biblical text panel that sits above the label cards on the story-detail
+   view. Hebrew renders larger and right-to-left; the verse refs caption sits
+   above as a small LTR label. The body collapses to a few lines by default
+   with a fade-out gradient to signal the truncation. */
+.story-text {
+  --story-text-bg: #fafaf6;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--story-text-bg);
+}
+
+.story-text-verses {
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.story-text-clip {
+  position: relative;
+  overflow: hidden;
+  /* Expanded state: enough room for any pericope. JS sets the data-collapsed
+     attribute back to "true" on a click to undo this. */
+  max-height: none;
+}
+
+.story-text[data-collapsed="true"] .story-text-clip {
+  /* ~2 lines at the body's 1.9 line-height, with a sliver of the third line
+     peeking through behind the gradient so the truncation is obvious. */
+  max-height: 4.5em;
+}
+
+.story-text[data-collapsed="true"] .story-text-clip::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2.2em;
+  background: linear-gradient(to bottom, transparent, var(--story-text-bg));
+  pointer-events: none;
+}
+
+.story-text-body {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.9;
+  font-family: "SBL Hebrew", "Ezra SIL", "Times New Roman", serif;
+}
+
+.story-text-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 2px 0;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.story-text-toggle:hover {
+  color: inherit;
+}
+
+/* Toggle button shows one label or the other based on collapsed state, so
+   the click handler only has to flip the attribute — no JS text swap. */
+.story-text[data-collapsed="true"] .story-text-toggle-hide,
+.story-text:not([data-collapsed="true"]) .story-text-toggle-show {
+  display: none;
+}
+
+.story-text-missing {
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* Collapsed list of false-answer prompts inside a label card. The summary
+   reads like inline text rather than a button so it stays unobtrusive when
+   the user just wants the positive evidence. */
+.label-card-false {
+  margin-top: 6px;
+}
+
+.label-card-false > summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+  list-style: none;
+  padding: 2px 0;
+}
+
+.label-card-false > summary::-webkit-details-marker {
+  display: none;
+}
+
+.label-card-false > summary::before {
+  content: "▸ ";
+  display: inline-block;
+  width: 1em;
+}
+
+.label-card-false[open] > summary::before {
+  content: "▾ ";
+}
+
+.label-card-false > .label-card-prompts {
+  margin-top: 4px;
+}
+
+/* Story-detail view: one card per label. */
+.label-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.label-card {
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 5px;
+  background: white;
+  overflow: hidden;
+}
+
+.label-card[data-category="Babylonian"]   { border-left-color: var(--cat-babylonian-text); }
+.label-card[data-category="Hellenistic"]  { border-left-color: var(--cat-hellenistic-text); }
+.label-card[data-category="Persian"]      { border-left-color: var(--cat-persian-text); }
+.label-card[data-category="Politics"]     { border-left-color: var(--cat-politics-text); }
+.label-card[data-category="Test"]         { border-left-color: var(--cat-test-text); }
+
+.label-card-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--row-hover);
+  border-bottom: 1px solid var(--border);
+}
+
+.label-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.label-card-title .label-card-category {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.label-card-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.label-card-bar {
+  width: 120px;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.label-card-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+.label-card-prompts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.label-card-prompts li {
+  font-size: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.label-card-prompts li:first-child {
+  border-top: none;
+}
+
+/* Each row is a <details>; the <summary> holds the grid layout so the row
+   itself becomes the click target that toggles the rationale below. */
+.prompt-row {
+  margin: 0;
+}
+
+.prompt-row-summary {
+  display: grid;
+  /* Auto-size the id, cache, and cert columns so they fit their longest
+     content instead of clipping. The prompt-text column gets whatever's
+     left. min-width:0 on the text cell lets it wrap inside the 1fr track. */
+  grid-template-columns: 14px auto auto 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.prompt-row-summary::-webkit-details-marker { display: none; }
+.prompt-row-summary::marker { display: none; }
+
+.prompt-row[open] .prompt-row-summary {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.prompt-rationale {
+  padding: 8px 14px 12px 36px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #333;
+  background: rgba(0, 0, 0, 0.02);
+  white-space: pre-wrap;
+}
+
+.prompt-rationale-empty {
+  font-style: italic;
+}
+
+.label-card-prompts .answer-mark {
+  font-weight: 700;
+}
+
+.label-card-prompts .answer-true { color: var(--true); }
+.label-card-prompts .answer-false { color: var(--false); opacity: 0.6; }
+
+.label-card-prompts .prompt-id {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Last 8 chars of the cache MD5 — lets the user grep the cache folder back
+   to the source file. Visually subordinated to the prompt id. */
+.label-card-prompts .prompt-cache {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.label-card-prompts .prompt-text {
+  min-width: 0;
+}
+
+.label-card-prompts .prompt-cert {
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.label-card-prompts li.is-false .prompt-text {
+  color: var(--muted);
+}
+
+/* Non-attributed labels (hits == 0). Dimmed and outline-only so they read
+   as background context rather than findings. */
+.label-card-unattributed {
+  opacity: 0.65;
+  border-style: dashed;
+}
+
+.label-card-unattributed .label-card-bar-fill {
+  background: var(--muted);
+}
+
+.labels-empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--muted);
+  background: var(--row-hover);
+  border-radius: 6px;
+}
+
+/* Ranking tab: same two-pane bones as Labels, plus controls + scored table. */
+.ranking-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 20px;
+  min-height: 600px;
+}
+
+.ranking-tree {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow-y: auto;
+  max-height: calc(100vh - 180px);
+  padding: 8px 6px;
+  font-size: 13px;
+}
+
+.ranking-tree-actions {
+  display: flex;
+  gap: 6px;
+  padding: 0 4px 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+
+.ranking-tree-actions button {
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: white;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.ranking-tree-actions button:hover {
+  background: var(--row-hover);
+  color: var(--fg);
+}
+
+.ranking-tree .tree-book-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ranking-tree .tree-book-check,
+.ranking-tree .tree-story-check {
+  margin: 0;
+  cursor: pointer;
+}
+
+.ranking-tree .tree-story {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+}
+
+.ranking-tree .tree-story-label {
+  flex: 1;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ranking-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 14px;
+}
+
+.ranking-controls {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  background: var(--row-hover);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ranking-controls-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.ranking-pick {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  color: var(--muted);
+  gap: 4px;
+}
+
+.ranking-pick select,
+.ranking-pick input[type="range"] {
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: white;
+  min-width: 180px;
+}
+
+.ranking-pick input[type="range"] {
+  padding: 0;
+  min-width: 160px;
+}
+
+.ranking-threshold {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.ranking-threshold #ranking-threshold-value {
+  min-width: 40px;
+  text-align: right;
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.ranking-labels-row {
+  display: grid;
+  grid-template-columns: 1fr 240px;
+  gap: 16px;
+  align-items: start;
+}
+
+.ranking-labels-head {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.ranking-labels-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 28px;
+}
+
+.ranking-labels-list:empty::before {
+  content: "(none picked — add labels using the dropdown →)";
+  color: var(--muted);
+  font-style: italic;
+  font-size: 12px;
+  padding: 4px 0;
+}
+
+.ranking-labels-list li {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 8px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.ranking-labels-list .rank-num {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.ranking-labels-list .rank-label {
+  font-weight: 500;
+}
+
+.ranking-labels-list .rank-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.ranking-labels-list .rank-buttons button {
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 3px;
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.ranking-labels-list .rank-buttons button:hover:not(:disabled) {
+  background: var(--row-hover);
+  color: var(--fg);
+}
+
+.ranking-labels-list .rank-buttons button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.ranking-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ranking-results-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#ranking-summary {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fg);
+}
+
+#ranking-results-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+#ranking-results-body th,
+#ranking-results-body td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+#ranking-results-body th {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--row-hover);
+  position: sticky;
+  top: 0;
+}
+
+#ranking-results-body td.score-cell {
+  font-family: var(--mono);
+  text-align: right;
+  white-space: nowrap;
+}
+
+#ranking-results-body td.score-combined {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+#ranking-results-body td.score-cell-bar {
+  position: relative;
+  padding-right: 8px;
+}
+
+#ranking-results-body .score-bar {
+  display: inline-block;
+  height: 4px;
+  background: var(--accent);
+  border-radius: 2px;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+#ranking-results-body tr.story-row:hover {
+  background: var(--row-hover);
+  cursor: pointer;
+}
+
+.ranking-empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--muted);
+  background: var(--row-hover);
+  border-radius: 6px;
 }

@@ -20,7 +20,7 @@ def main():
     prompts = Prompts()
 
     print(f"Loaded {prompts.get_prompt_count()} prompts")
-    print(f"Available periods: {prompts.get_periods()}")
+    print(f"Available categories: {prompts.get_categories()}")
     print(f"Available topics: {len(prompts.get_topics())} unique topics\n")
 
     # Example 1: Access specific prompts
@@ -29,12 +29,12 @@ def main():
     # Get a specific prompt by ID
     prompt = prompts.get_prompt_by_id("1")
     print(f"Prompt #{prompt['id']}:")
-    print(f"  Period: {prompt['period']}")
+    print(f"  Category: {prompt['category']}")
     print(f"  Topic: {prompt['topic']}")
     print(f"  Text: {prompt['prompt']}\n")
 
-    # Filter prompts by period
-    babylonian_prompts = prompts.get_prompts_by_period("Babylonian")
+    # Filter prompts by category
+    babylonian_prompts = prompts.get_prompts_by_category("Babylonian")
     print(f"Found {len(babylonian_prompts)} Babylonian prompts")
 
     # Filter prompts by topic

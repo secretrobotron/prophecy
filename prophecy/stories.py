@@ -1,9 +1,12 @@
 """
 Stories class for the Prophecy project.
 
-This module provides the Stories class for accessing biblical stories from the stories.yml data.
+This module provides the Stories class for accessing biblical stories from a
+stories YAML file (``data/stories/stories.yml`` by default; configurable via
+Settings).
 """
 
+import re
 from pathlib import Path
 
 import yaml
@@ -11,43 +14,105 @@ import yaml
 from .settings import Settings
 
 
+class _StoriesYamlLoader(yaml.SafeLoader):
+    """SafeLoader without YAML 1.1's sexagesimal int resolver.
+
+    PyYAML defaults to YAML 1.1, which interprets unquoted ``N:N`` scalars as
+    base-60 integers (so ``- 1:7`` silently becomes ``67``). Our verse refs
+    are always ``chapter:verse[-chapter:verse]`` strings, never sexagesimal
+    numbers, so we strip that branch from the int resolver and leave the rest
+    of safe-loader behavior untouched.
+    """
+
+
+# A standard YAML-1.2-style int resolver: binary, octal, decimal, hex — no
+# sexagesimal branch.
+_NON_SEXAGESIMAL_INT_RE = re.compile(
+    r"""^(?:
+        [-+]?0b[0-1_]+
+        | [-+]?0[0-7_]+
+        | [-+]?(?:0 | [1-9][0-9_]*)
+        | [-+]?0x[0-9a-fA-F_]+
+    )$""",
+    re.VERBOSE,
+)
+
+
+def _install_non_sexagesimal_int_resolver() -> None:
+    """Replace the inherited int resolvers on _StoriesYamlLoader with sexagesimal-free ones.
+
+    Implicit resolvers are class-level dicts keyed by leading character. We
+    copy SafeLoader's table once (so we don't mutate the parent), drop every
+    ``tag:yaml.org,2002:int`` entry, and register the replacement for the
+    same set of leading characters PyYAML registers ints under.
+    """
+    _StoriesYamlLoader.yaml_implicit_resolvers = {
+        key: [(tag, regex) for tag, regex in resolvers if tag != "tag:yaml.org,2002:int"]
+        for key, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
+    }
+    _StoriesYamlLoader.add_implicit_resolver(
+        "tag:yaml.org,2002:int", _NON_SEXAGESIMAL_INT_RE, list("-+0123456789")
+    )
+
+
+_install_non_sexagesimal_int_resolver()
+
+
 class Stories:
     """
-    A class for accessing biblical stories from the stories.yml data.
+    A class for accessing biblical stories from a stories YAML file.
 
-    This class encapsulates access to the stories data and provides properties
-    for extracting story information including title, book, and verse ranges.
+    Files live in ``data/stories/`` by default (configurable via
+    ``Settings.stories_folder``). The active catalog is normally
+    ``stories.yml``, but the filename is overridable via
+    ``Settings.stories_file`` or ``Stories(stories_file=...)`` so callers can
+    swap in alternative catalogs like ``stories-according-to-source.yml``.
     """
 
-    def __init__(self, data_folder: str | Path | None = None):
+    def __init__(
+        self,
+        data_folder: str | Path | None = None,
+        stories_file: str | Path | None = None,
+        stories_folder: str | Path | None = None,
+    ):
         """
         Initialize the Stories class.
 
         Args:
-            data_folder: Path to the data folder containing stories.yml.
-                If None, falls back to ``Settings.load()``, which layers
-                prophecy.toml, the PROPHECY_DATA_FOLDER env var, and the
-                dataclass default ('data').
+            data_folder: Path to the data folder. If None, falls back to
+                ``Settings.load()``.
+            stories_file: Name of the stories YAML file. Resolved against
+                ``stories_folder`` if relative, used as-is if absolute.
+                If None, falls back to ``Settings.load().stories_file``.
+            stories_folder: Subfolder under ``data_folder`` holding the
+                stories YAML files (default ``stories``). If None, falls
+                back to ``Settings.load().stories_folder``.
         """
-        if data_folder is None:
-            data_folder = Settings.load().data_folder
+        # Route everything through Settings.load so resolution rules stay in
+        # one place and explicit kwargs continue to win over env / toml.
+        settings = Settings.load(
+            data_folder=data_folder,
+            stories_file=stories_file,
+            stories_folder=stories_folder,
+        )
+        self.data_folder = settings.data_folder
+        self.stories_folder = settings.resolve_stories_folder()
+        self.stories_path = settings.resolve_stories_path()
 
-        self.data_folder = Path(data_folder)
-
-        # Validate data folder exists
         if not self.data_folder.exists():
             raise FileNotFoundError(f"Data folder not found: {self.data_folder}")
 
-        # Load the stories.yml file
-        self.stories_path = self.data_folder / "stories.yml"
         if not self.stories_path.exists():
             raise FileNotFoundError(f"Stories file not found: {self.stories_path}")
 
         with open(self.stories_path, encoding="utf-8") as f:
-            self._stories_data = yaml.safe_load(f)
+            self._stories_data = yaml.load(f, Loader=_StoriesYamlLoader)
 
         if not isinstance(self._stories_data, dict):
-            raise ValueError("Invalid stories.yml format: expected dictionary at root level")
+            raise ValueError(
+                f"Invalid stories file format ({self.stories_path}): "
+                "expected dictionary at root level"
+            )
 
     @property
     def titles(self) -> list[str]:
@@ -84,8 +149,10 @@ class Story:
     """
     Represents a single biblical story with its metadata.
 
-    This class provides access to individual story properties including
-    title, book, and verse ranges.
+    Stories always carry a title, book, and verse ranges. They may also
+    carry an optional ``sources`` list — currently free-form strings used
+    for cataloging (e.g. documentary-hypothesis source markers like "E",
+    "P", "J"); the schema is expected to harden over time.
     """
 
     def __init__(self, title: str, story_data: dict):
@@ -94,7 +161,8 @@ class Story:
 
         Args:
             title: The title of the story
-            story_data: Dictionary containing 'book' and 'verses' keys
+            story_data: Dictionary containing 'book' and 'verses' keys,
+                and an optional 'sources' key (list of strings).
 
         Raises:
             ValueError: If story_data is missing required fields
@@ -111,9 +179,17 @@ class Story:
         if not isinstance(story_data["verses"], list):
             raise ValueError(f"Story '{title}' verses field must be a list")
 
+        sources = story_data.get("sources", [])
+        if not isinstance(sources, list):
+            raise ValueError(f"Story '{title}' sources field must be a list")
+        for s in sources:
+            if not isinstance(s, str):
+                raise ValueError(f"Story '{title}' sources entries must be strings")
+
         self._title = title
         self._book = story_data["book"]
         self._verses = story_data["verses"]
+        self._sources: list[str] = list(sources)
 
     @property
     def title(self) -> str:
@@ -129,6 +205,11 @@ class Story:
     def verses(self) -> list[str]:
         """Get the list of verse ranges for this story."""
         return self._verses.copy()  # Return a copy to prevent modification
+
+    @property
+    def sources(self) -> list[str]:
+        """Optional source tags for this story (empty list if none declared)."""
+        return self._sources.copy()
 
     def to_bible_parts(self) -> list[dict[str, str]]:
         """

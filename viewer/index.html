@@ -10,7 +10,9 @@
   <header>
     <h1>Prophecy Viewer</h1>
     <nav class="tabs">
-      <button class="tab-button active" data-tab="prompts">Prompts</button>
+      <button class="tab-button active" data-tab="labels">Labels</button>
+      <button class="tab-button" data-tab="ranking">Ranking</button>
+      <button class="tab-button" data-tab="prompts">Prompts</button>
       <button class="tab-button" data-tab="responses">Responses</button>
       <button class="tab-button" data-tab="query">Query</button>
     </nav>
@@ -18,10 +20,115 @@
   </header>
 
   <main>
-    <section id="tab-prompts" class="tab-panel active">
+    <section id="tab-labels" class="tab-panel active">
+      <div class="labels-layout">
+        <aside class="labels-tree" aria-label="Books and stories">
+          <ul id="labels-book-list" class="tree-root"></ul>
+        </aside>
+        <div class="labels-pane">
+          <div class="labels-toolbar">
+            <h2 id="labels-pane-title" class="muted">Select a book</h2>
+            <div class="labels-toolbar-filters">
+              <div class="multi-dropdown" data-target="labels-category">
+                <span class="multi-label">Category</span>
+                <button type="button" class="multi-toggle" aria-expanded="false" aria-haspopup="listbox">
+                  <span class="multi-summary">All</span>
+                  <span class="multi-chevron" aria-hidden="true">&#9662;</span>
+                </button>
+                <div class="multi-panel" hidden>
+                  <div class="multi-actions">
+                    <button type="button" data-target="labels-category" data-action="all">all</button>
+                    <button type="button" data-target="labels-category" data-action="none">none</button>
+                  </div>
+                  <div id="labels-category" class="checkbox-list"></div>
+                </div>
+              </div>
+              <div class="multi-dropdown" data-target="labels-topic">
+                <span class="multi-label">Topic</span>
+                <button type="button" class="multi-toggle" aria-expanded="false" aria-haspopup="listbox">
+                  <span class="multi-summary">All</span>
+                  <span class="multi-chevron" aria-hidden="true">&#9662;</span>
+                </button>
+                <div class="multi-panel" hidden>
+                  <div class="multi-actions">
+                    <button type="button" data-target="labels-topic" data-action="all">all</button>
+                    <button type="button" data-target="labels-topic" data-action="none">none</button>
+                  </div>
+                  <div id="labels-topic" class="checkbox-list"></div>
+                </div>
+              </div>
+              <label class="labels-engine-pick">Engine
+                <select id="labels-engine"><option value="">(all)</option></select>
+              </label>
+              <label class="labels-toggle">
+                <input type="checkbox" id="labels-show-unattributed">
+                Show non-attributed
+              </label>
+            </div>
+          </div>
+          <div id="labels-pane-body"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-ranking" class="tab-panel">
+      <div class="ranking-layout">
+        <aside class="ranking-tree" aria-label="Books and stories">
+          <div class="ranking-tree-actions">
+            <button type="button" data-action="all" data-target="ranking-stories">all</button>
+            <button type="button" data-action="none" data-target="ranking-stories">none</button>
+          </div>
+          <ul id="ranking-book-list" class="tree-root"></ul>
+        </aside>
+        <div class="ranking-pane">
+          <div class="ranking-controls">
+            <div class="ranking-controls-row">
+              <label class="ranking-pick">Engine
+                <select id="ranking-engine"><option value="">(all)</option></select>
+              </label>
+              <label class="ranking-pick">Score
+                <select id="ranking-score-mode">
+                  <option value="weighted">Weighted (confidence × hit)</option>
+                  <option value="straight">Straight (hit count)</option>
+                </select>
+              </label>
+              <label class="ranking-pick">Combine
+                <select id="ranking-combine-mode">
+                  <option value="position">Position-weighted</option>
+                  <option value="equal">Equal average</option>
+                </select>
+              </label>
+              <label class="ranking-pick ranking-threshold">Threshold
+                <input type="range" id="ranking-threshold" min="0" max="100" step="1" value="0" />
+                <span id="ranking-threshold-value" class="mono">0%</span>
+              </label>
+            </div>
+            <div class="ranking-labels-row">
+              <div class="ranking-labels-picked">
+                <div class="ranking-labels-head">Picked labels <span class="muted">(order = rank priority when position-weighted)</span></div>
+                <ol id="ranking-labels-list" class="ranking-labels-list"></ol>
+              </div>
+              <div class="ranking-labels-add">
+                <label class="ranking-pick">Add label
+                  <select id="ranking-label-add"><option value="">(choose…)</option></select>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="ranking-results">
+            <div class="ranking-results-head">
+              <h2 id="ranking-summary" class="muted">Pick labels and stories to rank.</h2>
+            </div>
+            <div id="ranking-results-body"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-prompts" class="tab-panel">
       <div class="filters">
-        <label>Period
-          <select id="prompts-period"><option value="">(all)</option></select>
+        <label>Category
+          <select id="prompts-category"><option value="">(all)</option></select>
         </label>
         <label>Topic
           <select id="prompts-topic"><option value="">(all)</option></select>
@@ -33,7 +140,7 @@
       </div>
       <table id="prompts-table">
         <thead>
-          <tr><th>ID</th><th>Period</th><th>Topic</th><th>Prompt</th><th>Results</th></tr>
+          <tr><th>ID</th><th>Category</th><th>Topic</th><th>Prompt</th><th>Results</th></tr>
         </thead>
         <tbody></tbody>
       </table>
@@ -47,8 +154,8 @@
         <label>Story
           <select id="responses-story"><option value="">(all)</option></select>
         </label>
-        <label>Period
-          <select id="responses-period"><option value="">(all)</option></select>
+        <label>Category
+          <select id="responses-category"><option value="">(all)</option></select>
         </label>
         <label>Topic
           <select id="responses-topic"><option value="">(all)</option></select>
@@ -74,7 +181,7 @@
             <th>Story</th>
             <th>Book</th>
             <th>Prompt</th>
-            <th>Period</th>
+            <th>Category</th>
             <th>Topic</th>
             <th>Engine</th>
             <th>Answer</th>
@@ -88,18 +195,18 @@
 
     <section id="tab-query" class="tab-panel">
       <div class="filters">
-        <div class="multi-dropdown" data-target="query-period">
-          <span class="multi-label">Period</span>
+        <div class="multi-dropdown" data-target="query-category">
+          <span class="multi-label">Category</span>
           <button type="button" class="multi-toggle" aria-expanded="false" aria-haspopup="listbox">
             <span class="multi-summary">All</span>
             <span class="multi-chevron" aria-hidden="true">&#9662;</span>
           </button>
           <div class="multi-panel" hidden>
             <div class="multi-actions">
-              <button type="button" data-target="query-period" data-action="all">all</button>
-              <button type="button" data-target="query-period" data-action="none">none</button>
+              <button type="button" data-target="query-category" data-action="all">all</button>
+              <button type="button" data-target="query-category" data-action="none">none</button>
             </div>
-            <div id="query-period" class="checkbox-list"></div>
+            <div id="query-category" class="checkbox-list"></div>
           </div>
         </div>
 
@@ -149,7 +256,7 @@
           <tr>
             <th>Story</th>
             <th>Book</th>
-            <th>Period</th>
+            <th>Category</th>
             <th>Topic</th>
             <th>Engine</th>
             <th>Hits</th>

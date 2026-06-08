@@ -306,8 +306,8 @@ prompts = Prompts()
 sentiment_prompts = prompts.get_prompts_by_topic('sentiment')
 thematic_prompts = prompts.get_prompts_by_topic('theme')
 
-# Get prompts by period
-ancient_prompts = prompts.get_prompts_by_period('ancient')
+# Get prompts by category
+ancient_prompts = prompts.get_prompts_by_category('ancient')
 
 # Use with AI analysis
 for prompt_data in sentiment_prompts:

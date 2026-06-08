@@ -29,7 +29,7 @@ class TestStoriesStructure:
     @pytest.fixture(scope="class")
     def stories_data(self, data_path):
         """Load the stories.yml file."""
-        stories_file = data_path / "stories.yml"
+        stories_file = data_path / "stories" / "stories.yml"
         assert stories_file.exists(), f"stories.yml not found at {stories_file}"
 
         with open(stories_file, encoding="utf-8") as f:
