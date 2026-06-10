@@ -32,6 +32,7 @@ const state = {
   booksView: "ranked",              // "ranked" | "heatmap"
   booksEngine: "",                  // engine filter ("" = all engines, mirrors Labels)
   booksCategoryFilter: null,        // Set of allowed categories, null = all
+  booksScoreMode: "weighted",       // "weighted" | "hit" | "coverage" — picks the sort key
 
   // Ranking tab UI state
   rankingStoriesChecked: null,      // Set of "book\tstory" keys; null = "all", populated on first render
@@ -311,6 +312,11 @@ function bindEvents() {
       renderBooksPaneBody();
     });
   }
+  // Score mode picker — re-aggregates and re-sorts under the new metric.
+  document.getElementById("books-score-mode").addEventListener("change", (e) => {
+    state.booksScoreMode = e.target.value;
+    renderBooksPaneBody();
+  });
 
   // Ranking tab: all the small controls live in a static block; render the
   // body whenever any of them changes.
@@ -919,9 +925,26 @@ function renderBooksPaneBody() {
   }
 }
 
+// Per-story score for one label row, in [0, 1]. "Weighted" multiplies hit
+// rate by the model's self-rated certainty so weak hits with low certainty
+// are discounted; "hit" ignores certainty; "coverage" is the binary
+// presence signal used to count toward layer coverage.
+function storyScore(row, mode) {
+  const hitRate = row.total > 0 ? row.hits / row.total : 0;
+  if (mode === "hit") return hitRate;
+  if (mode === "coverage") return hitRate > 0 ? 1 : 0;
+  // "weighted" (default): hit_rate × certainty. avg_certainty is 0-100.
+  const cert = (row.avg_certainty || 0) / 100;
+  return hitRate * cert;
+}
+
 // Aggregate by (category, topic) across the given (already book-filtered)
-// label rows. Returns rows sorted by coverage desc, then avg hit rate desc.
+// label rows. Computes both layer strength (mean per-story score under the
+// chosen mode) and coverage (share of stories with any signal). The chosen
+// score mode selects the sort key — both numbers stay displayed so the
+// user can read "widespread-but-weak" vs "narrow-but-strong" by eye.
 function aggregateBooksLabels(rows, totalStories) {
+  const mode = state.booksScoreMode;
   const byKey = new Map();
   for (const r of rows) {
     const key = `${r.category}\t${r.topic}`;
@@ -930,51 +953,97 @@ function aggregateBooksLabels(rows, totalStories) {
       agg = {
         category: r.category,
         topic: r.topic,
-        stories: new Set(),
-        hit_rate_sum: 0,
-        hit_rate_count: 0,
+        stories_hit: new Set(),
+        score_sum: 0,
+        score_count: 0,
       };
       byKey.set(key, agg);
     }
-    agg.stories.add(r.story);
-    const hitRate = r.total > 0 ? r.hits / r.total : 0;
-    agg.hit_rate_sum += hitRate;
-    agg.hit_rate_count += 1;
+    const score = storyScore(r, mode);
+    agg.score_sum += score;
+    agg.score_count += 1;
+    if (score > 0) {
+      agg.stories_hit.add(r.story);
+    }
   }
   const out = [];
   for (const a of byKey.values()) {
-    const coverage = totalStories > 0 ? a.stories.size / totalStories : 0;
-    const avg_hit_rate = a.hit_rate_count > 0 ? a.hit_rate_sum / a.hit_rate_count : 0;
+    const coverage =
+      totalStories > 0 ? a.stories_hit.size / totalStories : 0;
+    const layer_score = a.score_count > 0 ? a.score_sum / a.score_count : 0;
     out.push({
       category: a.category,
       topic: a.topic,
-      story_count: a.stories.size,
+      story_count: a.stories_hit.size,
       total_stories: totalStories,
       coverage,
-      avg_hit_rate,
+      layer_score,
     });
   }
-  out.sort((a, b) => b.coverage - a.coverage || b.avg_hit_rate - a.avg_hit_rate);
+  // Sort by the selected primary metric, falling back to the other so ties
+  // don't shuffle every render.
+  const primary = (a) => (mode === "coverage" ? a.coverage : a.layer_score);
+  const secondary = (a) => (mode === "coverage" ? a.layer_score : a.coverage);
+  out.sort((a, b) => primary(b) - primary(a) || secondary(b) - secondary(a));
   return out;
+}
+
+// Parse "chapter:verse" or "chapter:verse-chapter:verse" → numeric sort key.
+// Returns [chapter, verse] for the *first* verse of the range.
+function firstVersePos(verseRange) {
+  if (!verseRange) return [Infinity, Infinity];
+  const start = String(verseRange).split("-")[0];
+  const parts = start.split(":");
+  const ch = Number(parts[0]) || 0;
+  const v = Number(parts[1]) || 0;
+  return [ch, v];
+}
+
+// Canonical narrative order for stories in a book: by the (chapter, verse)
+// of the first verse range. Stories with no metadata fall to the end
+// alphabetically so the order is always stable.
+function sortStoriesCanonical(stories) {
+  return stories.slice().sort((a, b) => {
+    const ma = state.stories[a];
+    const mb = state.stories[b];
+    const va = ma && Array.isArray(ma.verses) ? ma.verses[0] : null;
+    const vb = mb && Array.isArray(mb.verses) ? mb.verses[0] : null;
+    const [ca, ra] = firstVersePos(va);
+    const [cb, rb] = firstVersePos(vb);
+    if (ca !== cb) return ca - cb;
+    if (ra !== rb) return ra - rb;
+    return a.localeCompare(b);
+  });
 }
 
 function renderBooksRanked(rows, stories, body) {
   const agg = aggregateBooksLabels(rows, stories.length);
+  const mode = state.booksScoreMode;
+  // The bar fill follows the chosen score mode: Weighted/Hit show layer
+  // strength; Coverage shows coverage. Either way the *other* number is
+  // surfaced as text so the user sees both dimensions.
   const items = agg
     .map((a) => {
       const coveragePct = Math.round(a.coverage * 100);
-      const avgPct = Math.round(a.avg_hit_rate * 100);
+      const scorePct = Math.round(a.layer_score * 100);
+      const fillPct = mode === "coverage" ? coveragePct : scorePct;
+      const primaryLabel =
+        mode === "coverage" ? `${coveragePct}%` : `${scorePct}%`;
+      const secondaryLabel =
+        mode === "coverage"
+          ? `${a.story_count}/${a.total_stories} · score ${scorePct}%`
+          : `${a.story_count}/${a.total_stories} stories · cov ${coveragePct}%`;
       return `<li class="books-bar-row" data-category="${escapeHtml(a.category)}" data-topic="${escapeHtml(a.topic)}" title="Open ${escapeHtml(a.category)} / ${escapeHtml(a.topic)} in Labels">
         <div class="books-bar-label">
           <span class="books-bar-cat" data-category="${escapeHtml(a.category)}">${escapeHtml(a.category)}</span>
           <span class="books-bar-topic">${escapeHtml(a.topic)}</span>
         </div>
-        <div class="books-bar-track" role="img" aria-label="${coveragePct}% coverage, ${avgPct}% average hit rate">
-          <div class="books-bar-fill" data-category="${escapeHtml(a.category)}" style="width: ${coveragePct}%"></div>
+        <div class="books-bar-track" role="img" aria-label="${scorePct}% layer score, ${coveragePct}% coverage">
+          <div class="books-bar-fill" data-category="${escapeHtml(a.category)}" style="width: ${fillPct}%"></div>
         </div>
         <div class="books-bar-stats mono">
-          <span class="books-bar-cov">${coveragePct}%</span>
-          <span class="muted">${a.story_count}/${a.total_stories} · avg ${avgPct}%</span>
+          <span class="books-bar-cov">${primaryLabel}</span>
+          <span class="muted">${secondaryLabel}</span>
         </div>
       </li>`;
     })
@@ -994,18 +1063,19 @@ function renderBooksHeatmap(rows, stories, body) {
     return;
   }
   // Column order: by ranked importance (same as view A). Row order:
-  // alphabetical for now — gives a stable, predictable layout. A future
-  // pass could sort rows by similarity to make clusters pop.
+  // canonical narrative order (chapter:verse of the first verse range), so
+  // the user reads down the book the way it's traditionally narrated.
   const cols = agg;
-  const rowsSorted = stories.slice().sort();
+  const rowsSorted = sortStoriesCanonical(stories);
+  const mode = state.booksScoreMode;
   const cellByKey = new Map();
   for (const r of rows) {
     const key = `${r.story}\t${r.category}\t${r.topic}`;
-    const rate = r.total > 0 ? r.hits / r.total : 0;
+    const score = storyScore(r, mode);
     // Same (story, label) may appear under multiple engines if the user has
     // both selected — take the max so cells show the strongest signal.
     const prev = cellByKey.get(key) || 0;
-    cellByKey.set(key, Math.max(prev, rate));
+    cellByKey.set(key, Math.max(prev, score));
   }
 
   const headerCells = cols
@@ -1021,8 +1091,8 @@ function renderBooksHeatmap(rows, stories, body) {
     .map((story) => {
       const cells = cols
         .map((c) => {
-          const rate = cellByKey.get(`${story}\t${c.category}\t${c.topic}`) || 0;
-          const pct = Math.round(rate * 100);
+          const score = cellByKey.get(`${story}\t${c.category}\t${c.topic}`) || 0;
+          const pct = Math.round(score * 100);
           // Intensity steps keep colors readable and the visual rhythm
           // discrete — easier to see banding than a smooth gradient.
           let intensity = "i0";
@@ -1030,10 +1100,12 @@ function renderBooksHeatmap(rows, stories, body) {
           else if (pct >= 50) intensity = "i3";
           else if (pct >= 25) intensity = "i2";
           else if (pct > 0) intensity = "i1";
+          const scoreLabel =
+            mode === "coverage" ? (pct > 0 ? "100%" : "0%") : `${pct}%`;
           const title = pct > 0
-            ? `${escapeHtml(story)} — ${escapeHtml(c.category)} / ${escapeHtml(c.topic)}: ${pct}% hit`
+            ? `${escapeHtml(story)} — ${escapeHtml(c.category)} / ${escapeHtml(c.topic)}: ${scoreLabel} (click to open story)`
             : `${escapeHtml(story)} — no hit on ${escapeHtml(c.category)} / ${escapeHtml(c.topic)}`;
-          return `<td class="books-heat-cell ${intensity}" data-category="${escapeHtml(c.category)}" data-topic="${escapeHtml(c.topic)}" title="${title}"></td>`;
+          return `<td class="books-heat-cell ${intensity}" data-story="${escapeHtml(story)}" data-category="${escapeHtml(c.category)}" data-topic="${escapeHtml(c.topic)}" title="${title}"></td>`;
         })
         .join("");
       return `<tr><th class="books-heat-rowhead" data-story="${escapeHtml(story)}">${escapeHtml(story)}</th>${cells}</tr>`;
@@ -1051,14 +1123,21 @@ function renderBooksHeatmap(rows, stories, body) {
       drillToLabels(state.booksBookSelected, node.dataset.category, node.dataset.topic);
     });
   }
-  // Cell click: same as column for now — the column carries the meaningful
-  // label. Cell-specific drill (book + story + label) is what the row label does.
+  // Cell click: open the story detail in Labels with category/topic narrowed
+  // to this cell's label so the user can immediately see why the cell has
+  // its score (the underlying prompts + answers).
   for (const node of body.querySelectorAll(".books-heat-cell")) {
     node.addEventListener("click", () => {
-      drillToLabels(state.booksBookSelected, node.dataset.category, node.dataset.topic);
+      drillToLabelsCell(
+        state.booksBookSelected,
+        node.dataset.story,
+        node.dataset.category,
+        node.dataset.topic,
+      );
     });
   }
-  // Row label click: open the existing story-detail view in Labels.
+  // Row label click: open the existing story-detail view in Labels with all
+  // labels visible.
   for (const node of body.querySelectorAll(".books-heat-rowhead")) {
     node.addEventListener("click", () => {
       drillToLabelsStory(state.booksBookSelected, node.dataset.story);
@@ -1074,6 +1153,25 @@ function drillToLabels(book, category, topic) {
   state.labelsStorySelected = null;
   state.labelsBookExpanded.add(book);
   // Mirror engine selection so the drill is consistent with what was visible.
+  if (state.booksEngine) {
+    state.labelsEngine = state.booksEngine;
+    document.getElementById("labels-engine").value = state.booksEngine;
+  }
+  setSingleChecked("labels-category", category);
+  setSingleChecked("labels-topic", topic);
+  switchTab("labels");
+  renderLabelsTree();
+  renderLabelsPaneBody();
+}
+
+// Drill into Labels at the story-detail view, narrowed to one (category,
+// topic) — the "why is this cell that colour?" jump. Shows the story's
+// label cards filtered to just the clicked label so the prompts +
+// rationales for that exact score are immediately visible.
+function drillToLabelsCell(book, story, category, topic) {
+  state.labelsBookSelected = book;
+  state.labelsStorySelected = story;
+  state.labelsBookExpanded.add(book);
   if (state.booksEngine) {
     state.labelsEngine = state.booksEngine;
     document.getElementById("labels-engine").value = state.booksEngine;

@@ -85,6 +85,13 @@
                 <button type="button" class="books-view-btn active" data-view="ranked" role="tab" aria-selected="true">Ranked</button>
                 <button type="button" class="books-view-btn" data-view="heatmap" role="tab" aria-selected="false">Heatmap</button>
               </div>
+              <label class="books-pick">Score
+                <select id="books-score-mode">
+                  <option value="weighted">Weighted (hit × cert)</option>
+                  <option value="hit">Hit rate</option>
+                  <option value="coverage">Coverage</option>
+                </select>
+              </label>
               <div class="multi-dropdown" data-target="books-category">
                 <span class="multi-label">Category</span>
                 <button type="button" class="multi-toggle" aria-expanded="false" aria-haspopup="listbox">

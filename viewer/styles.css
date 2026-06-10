@@ -1215,7 +1215,8 @@ footer {
   font-weight: 600;
 }
 
-.books-engine-pick {
+.books-engine-pick,
+.books-pick {
   font-size: 13px;
   color: var(--muted);
   display: inline-flex;
@@ -1223,9 +1224,11 @@ footer {
   gap: 6px;
 }
 
-.books-engine-pick select {
+.books-engine-pick select,
+.books-pick select {
   font-size: 13px;
 }
+
 
 /* Ranked view: bars sized by coverage, colored by category. */
 .books-bar-list {
