@@ -2,7 +2,7 @@ name: Deploy viewer to GitHub Pages
 
 on:
   push:
-    branches: [main, feature/prompt-filtering-and-query]
+    branches: [main, dev]
   workflow_dispatch:
 
 # Pages is global state — never run two deploys concurrently.
