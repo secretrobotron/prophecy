@@ -272,8 +272,9 @@ def create_argument_parser() -> argparse.ArgumentParser:
         description=(
             "Extract biblical stories, populate prompts, and get AI responses. "
             "See 'query' to aggregate cached results, 'label' to derive "
-            "per-story labels, and 'export' to assemble a static bundle for "
-            "the web viewer."
+            "per-story labels, 'profile' to match those labels against curated "
+            "author/group profiles, and 'export' to assemble a static bundle "
+            "for the web viewer."
         ),
         epilog=(
             "Subcommands:\n"
@@ -281,6 +282,8 @@ def create_argument_parser() -> argparse.ArgumentParser:
             "(see 'python -m prophecy query --help')\n"
             "  label    Derive per-story labels from cached results "
             "(see 'python -m prophecy label --help')\n"
+            "  profile  Match per-story labels against curated author/group profiles "
+            "(see 'python -m prophecy profile --help')\n"
             "  export   Assemble a static bundle of cached results for the viewer "
             "(see 'python -m prophecy export --help')\n"
             "  prune    Delete cached result files by engine filter "
@@ -1566,6 +1569,173 @@ def label_command(argv: list[str]) -> int:
     return 0
 
 
+def _create_profile_parser() -> argparse.ArgumentParser:
+    """Argparse parser for the 'profile' subcommand."""
+    parser = argparse.ArgumentParser(
+        description=(
+            "Match every (story, engine) pair against every profile in "
+            "data/profiles/*.yml and write a JSON artifact the viewer can "
+            "use to see which stories 'look like' the work of each profile. "
+            "Reads the existing labels.json — run `label` first."
+        ),
+        prog="python -m prophecy profile",
+    )
+    parser.add_argument("--data", help="Path to data folder (overrides PROPHECY_DATA_FOLDER)")
+    parser.add_argument(
+        "--labels",
+        default=None,
+        help="Input labels JSON (default: <data>/labels.json)",
+    )
+    parser.add_argument(
+        "--profiles-folder",
+        default=None,
+        help=(
+            "Folder containing profile YAML files (default: <data>/profiles). "
+            "Every *.yml / *.yaml inside is loaded and merged."
+        ),
+    )
+    parser.add_argument(
+        "--out",
+        default=None,
+        help="Output JSON path (default: <data>/profiles.json)",
+    )
+    parser.add_argument(
+        "--book",
+        action="append",
+        default=None,
+        help="Restrict to stories in these books. Repeatable or comma-separated.",
+    )
+    parser.add_argument(
+        "--engine",
+        action="append",
+        default=None,
+        help="Restrict to these engines. Repeatable or comma-separated.",
+    )
+    parser.add_argument(
+        "--matched-only",
+        action="store_true",
+        help="Only emit (profile, story, engine) entries where the profile matched.",
+    )
+    parser.add_argument(
+        "--verbosity",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Set logging verbosity (default: INFO)",
+    )
+    return parser
+
+
+def profile_command(argv: list[str]) -> int:
+    """Entry point for `python -m prophecy profile [...]`.
+
+    Joins data/labels.json with data/profiles/*.yml and writes
+    data/profiles.json — one entry per (profile, story, engine) triple
+    with per-label details and an overall matched boolean.
+    """
+    import dataclasses
+    import datetime
+
+    from .profiles import Profiles, match_profile
+
+    parser = _create_profile_parser()
+    args = parser.parse_args(argv)
+    logger = setup_logging(args.verbosity)
+
+    try:
+        settings = Settings.load(
+            data_folder=args.data,
+            profiles_folder=args.profiles_folder,
+        )
+        profiles_obj = Profiles(
+            data_folder=settings.data_folder,
+            profiles_folder=settings.profiles_folder,
+        )
+    except (FileNotFoundError, ValueError) as e:
+        logger.error(f"{e}")
+        return 1
+
+    labels_path = Path(args.labels) if args.labels else settings.data_folder / "labels.json"
+    if not labels_path.exists():
+        logger.error(f"Labels file not found: {labels_path}. Run `python -m prophecy label` first.")
+        return 1
+    try:
+        with open(labels_path, encoding="utf-8") as f:
+            labels_payload = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        logger.error(f"Failed to read {labels_path}: {e}")
+        return 1
+    label_entries = labels_payload.get("labels", [])
+
+    book_filter = set(parse_multi_value(args.book) or [])
+    engine_filter = set(parse_multi_value(args.engine) or [])
+
+    # group label entries by (story, book, engine) so each profile sees the
+    # full set of (category, topic) rows for one analysis target.
+    groups: dict[tuple[str, str, str], list[dict]] = {}
+    for entry in label_entries:
+        story = str(entry.get("story", ""))
+        book = str(entry.get("book", ""))
+        engine = str(entry.get("engine", ""))
+        if not story or not engine:
+            continue
+        if book_filter and book not in book_filter:
+            continue
+        if engine_filter and engine not in engine_filter:
+            continue
+        groups.setdefault((story, book, engine), []).append(entry)
+
+    all_profiles = profiles_obj.all()
+    if not all_profiles:
+        logger.warning(f"No profiles found in {profiles_obj.profiles_folder}")
+
+    matches: list[dict] = []
+    for profile in all_profiles:
+        for (story, book, engine), entries in groups.items():
+            matched, details = match_profile(profile, entries)
+            if args.matched_only and not matched:
+                continue
+            matches.append(
+                {
+                    "profile": profile.name,
+                    "story": story,
+                    "book": book,
+                    "engine": engine,
+                    "matched": matched,
+                    "labels": [dataclasses.asdict(d) for d in details],
+                }
+            )
+
+    matches.sort(key=lambda m: (m["profile"], m["book"], m["story"], m["engine"]))
+
+    out_path = Path(args.out) if args.out else settings.data_folder / "profiles.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "generated_at": datetime.datetime.now(datetime.UTC)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z"),
+        "profile_count": len(all_profiles),
+        "match_count": len(matches),
+        "profiles": [
+            {
+                "name": p.name,
+                "description": p.description,
+                "labels": [dataclasses.asdict(label) for label in p.labels],
+            }
+            for p in all_profiles
+        ],
+        "matches": matches,
+    }
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, separators=(",", ":"))
+
+    matched_count = sum(1 for m in matches if m["matched"])
+    logger.info(
+        f"Wrote {len(matches)} (profile, story, engine) entries "
+        f"({matched_count} matched) across {len(all_profiles)} profiles to {out_path}"
+    )
+    return 0
+
+
 def _create_prune_parser() -> argparse.ArgumentParser:
     """Argparse parser for the 'prune' subcommand."""
     parser = argparse.ArgumentParser(
@@ -1755,6 +1925,8 @@ def main():
         sys.exit(export_command(argv[1:]))
     if argv and argv[0] == "label":
         sys.exit(label_command(argv[1:]))
+    if argv and argv[0] == "profile":
+        sys.exit(profile_command(argv[1:]))
     if argv and argv[0] == "prune":
         sys.exit(prune_command(argv[1:]))
 

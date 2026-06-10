@@ -1,0 +1,17 @@
+# Profiles describe what it means for a story to "look like" the work of a
+# particular person or group: a bundle of (category, topic) labels with a
+# minimum hit-rate threshold each. A story matches the profile when every
+# listed label clears its threshold (AND).
+#
+# `min_hit_rate` is the share of probe prompts in that (category, topic)
+# group that came back true, expressed 0-100. Threshold values are
+# starting guesses; tune as the labelled dataset grows.
+
+Maccabees:
+  description: >-
+    2nd-century BCE Hasmonean authors. Nationalist (sovereignty,
+    self-determination, Hebrew identity) and populist (the leader rises
+    from and speaks for the people, against a corrupt elite).
+  labels:
+    - { category: Politics, topic: Nationalism, min_hit_rate: 30 }
+    - { category: Politics, topic: Populism,    min_hit_rate: 30 }

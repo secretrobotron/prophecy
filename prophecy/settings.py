@@ -34,6 +34,10 @@ class Settings:
     stories_folder: Path = Path("stories")
     stories_file: Path = Path("stories.yml")
     prompts_folder: Path = Path("prompts")
+    # Curated author/group profiles — bundles of label thresholds describing
+    # what it means to be e.g. the Maccabees. One file per profile is the
+    # common case; the loader merges every YAML in the folder.
+    profiles_folder: Path = Path("profiles")
     # Where `prophecy export` writes its static bundle by default. Independent
     # of data_folder because the export is consumed by the viewer / a static
     # site, not by the pipeline itself.
@@ -56,6 +60,8 @@ class Settings:
             self.stories_file = Path(self.stories_file)
         if isinstance(self.prompts_folder, str):
             self.prompts_folder = Path(self.prompts_folder)
+        if isinstance(self.profiles_folder, str):
+            self.profiles_folder = Path(self.profiles_folder)
         if isinstance(self.export_out_folder, str):
             self.export_out_folder = Path(self.export_out_folder)
         # Env vars arrive as strings; TOML/kwarg ints come through untouched.
@@ -95,6 +101,12 @@ class Settings:
         if self.prompts_folder.is_absolute():
             return self.prompts_folder
         return self.data_folder / self.prompts_folder
+
+    def resolve_profiles_folder(self) -> Path:
+        """Profiles folder resolved against ``data_folder`` if relative."""
+        if self.profiles_folder.is_absolute():
+            return self.profiles_folder
+        return self.data_folder / self.profiles_folder
 
     @classmethod
     def load(cls, *, config_path: Path | None = None, **overrides: Any) -> Settings:
