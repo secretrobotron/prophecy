@@ -84,6 +84,19 @@ async function bootstrap() {
     renderBooksTab();
     renderRankingTab();
     bindEvents();
+
+    // Honour the URL hash on first paint: deep-links like ?…#books open
+    // straight to that tab. Unknown / empty hash leaves the markup's
+    // default (Labels) selected.
+    const initial = window.location.hash.replace(/^#/, "");
+    if (validTabName(initial)) {
+      switchTab(initial, { fromHash: true });
+    }
+    // Back/forward navigation through tab history.
+    window.addEventListener("hashchange", () => {
+      const name = window.location.hash.replace(/^#/, "");
+      if (validTabName(name)) switchTab(name, { fromHash: true });
+    });
   } catch (err) {
     showFatal(err);
   }
@@ -413,7 +426,7 @@ function closeAllDropdowns() {
   }
 }
 
-function switchTab(name) {
+function switchTab(name, opts = {}) {
   for (const btn of document.querySelectorAll(".tab-button")) {
     btn.classList.toggle("active", btn.dataset.tab === name);
   }
@@ -421,6 +434,23 @@ function switchTab(name) {
     panel.classList.toggle("active", panel.id === `tab-${name}`);
   }
   if (name === "responses") renderResponses();
+  // Sync the URL hash so each tab change pushes a history entry — back
+  // button then walks the user through the tabs they visited. Skip when
+  // we're already responding to a hash change to avoid a feedback loop.
+  if (!opts.fromHash) {
+    const target = `#${name}`;
+    if (window.location.hash !== target) {
+      window.location.hash = name;
+    }
+  }
+}
+
+// The set of tab names backed by an actual panel — used to filter hash
+// values so a stray `#anything` doesn't blank the UI.
+function validTabName(name) {
+  return Boolean(
+    name && document.querySelector(`.tab-button[data-tab="${name}"]`),
+  );
 }
 
 // ---------- Labels tab ----------
