@@ -27,6 +27,12 @@ const state = {
   labelsTopicFilter: null,          // Set of allowed topics, null = all
   labelsShowUnattributed: false,    // false: hide zero-hit groups (default)
 
+  // Books tab UI state
+  booksBookSelected: null,          // book whose view is shown in the right pane
+  booksView: "ranked",              // "ranked" | "heatmap"
+  booksEngine: "",                  // engine filter ("" = all engines, mirrors Labels)
+  booksCategoryFilter: null,        // Set of allowed categories, null = all
+
   // Ranking tab UI state
   rankingStoriesChecked: null,      // Set of "book\tstory" keys; null = "all", populated on first render
   rankingBookExpanded: new Set(),   // books visually expanded in the tree
@@ -74,6 +80,7 @@ async function bootstrap() {
     populateFilterOptions();
     renderPrompts();
     renderLabelsTab();
+    renderBooksTab();
     renderRankingTab();
     bindEvents();
   } catch (err) {
@@ -282,6 +289,29 @@ function bindEvents() {
     });
   }
 
+  // Books tab: engine dropdown and category multi-select rerender the body.
+  document.getElementById("books-engine").addEventListener("change", (e) => {
+    state.booksEngine = e.target.value;
+    renderBooksPaneBody();
+  });
+  document.getElementById("books-category").addEventListener("change", (e) => {
+    if (e.target.matches('input[type="checkbox"]')) {
+      renderBooksPaneBody();
+    }
+  });
+  // View toggle (Ranked / Heatmap).
+  for (const btn of document.querySelectorAll(".books-view-btn")) {
+    btn.addEventListener("click", () => {
+      state.booksView = btn.dataset.view;
+      for (const b of document.querySelectorAll(".books-view-btn")) {
+        const active = b.dataset.view === state.booksView;
+        b.classList.toggle("active", active);
+        b.setAttribute("aria-selected", active ? "true" : "false");
+      }
+      renderBooksPaneBody();
+    });
+  }
+
   // Ranking tab: all the small controls live in a static block; render the
   // body whenever any of them changes.
   document.getElementById("ranking-engine").addEventListener("change", (e) => {
@@ -333,6 +363,9 @@ function bindEvents() {
       setAllChecked(target, action === "all");
       if (target === "labels-category" || target === "labels-topic") {
         renderLabelsPaneBody();
+      }
+      if (target === "books-category") {
+        renderBooksPaneBody();
       }
     });
   }
@@ -769,6 +802,321 @@ function renderPromptRow(p) {
       ${reasonBlock}
     </details>
   </li>`;
+}
+
+// ---------- Books tab ----------
+//
+// Per-book aggregate view. For a selected book, we sum across its stories to
+// surface which (category, topic) labels show up and how strongly. Two
+// presentations of the same underlying aggregation:
+//   - Ranked: horizontal bars sorted by coverage (share of stories carrying
+//     the label). Reads as "what does this book look like, overall?"
+//   - Heatmap: stories × labels grid. Reads as "which subset of stories
+//     does each label cluster on?" — the visual the user calls "layers".
+// Clicking a label routes back to the Labels tab pre-filtered to that
+// book + (category, topic) so the user can read the underlying prompts.
+
+function renderBooksTab() {
+  const engineSelect = document.getElementById("books-engine");
+  engineSelect.length = 1; // preserve "(all)"
+  const engines = sortedUnique(state.labels.map((l) => l.engine));
+  for (const e of engines) {
+    const opt = document.createElement("option");
+    opt.value = e;
+    opt.textContent = e;
+    engineSelect.appendChild(opt);
+  }
+
+  fillCheckboxList(
+    "books-category",
+    sortedUnique(state.labels.map((l) => l.category)),
+    true,
+  );
+
+  renderBooksList();
+  renderBooksPaneBody();
+}
+
+function readBooksFilters() {
+  const catChecked = readCheckedValues("books-category");
+  const catTotal = readAllValues("books-category").length;
+  state.booksCategoryFilter =
+    catChecked.length === catTotal ? null : new Set(catChecked);
+}
+
+// Labels filtered by current engine + category. The book filter is applied
+// per-render where needed, since the tree shows all books regardless.
+function filteredBooksLabels() {
+  return state.labels.filter((l) => {
+    if (state.booksEngine && l.engine !== state.booksEngine) return false;
+    if (state.booksCategoryFilter && !state.booksCategoryFilter.has(l.category)) return false;
+    const isAttributed = l.attributed !== undefined ? l.attributed : l.hits > 0;
+    if (!isAttributed) return false;
+    return true;
+  });
+}
+
+function renderBooksList() {
+  const root = document.getElementById("books-list");
+  // The book list is the universe of books that have any attributed labels —
+  // unfiltered by category/engine so the user can always pick a book and
+  // discover that the current filter hides everything in it.
+  const universe = state.labels.filter((l) => {
+    const isAttributed = l.attributed !== undefined ? l.attributed : l.hits > 0;
+    return isAttributed;
+  });
+  const books = sortedUnique(universe.map((l) => l.book));
+  root.innerHTML = books
+    .map((book) => {
+      const active = state.booksBookSelected === book ? " active" : "";
+      return `<li class="books-list-item${active}" data-book="${escapeHtml(book)}">${escapeHtml(book)}</li>`;
+    })
+    .join("");
+  for (const node of root.querySelectorAll(".books-list-item")) {
+    node.addEventListener("click", () => {
+      state.booksBookSelected = node.dataset.book;
+      renderBooksList();
+      renderBooksPaneBody();
+    });
+  }
+}
+
+function renderBooksPaneBody() {
+  readBooksFilters();
+
+  const title = document.getElementById("books-pane-title");
+  const body = document.getElementById("books-pane-body");
+
+  if (!state.labels.length) {
+    title.textContent = "No labels available";
+    body.innerHTML = `<div class="labels-empty">
+      Run <code>python -m prophecy label</code> and re-export to populate this tab.
+    </div>`;
+    return;
+  }
+
+  if (!state.booksBookSelected) {
+    title.textContent = "Select a book";
+    body.innerHTML = `<div class="labels-empty">Pick a book on the left to see how labels layer across its stories.</div>`;
+    return;
+  }
+
+  const filtered = filteredBooksLabels().filter(
+    (l) => l.book === state.booksBookSelected,
+  );
+  const stories = sortedUnique(filtered.map((l) => l.story));
+  title.innerHTML = `${escapeHtml(state.booksBookSelected)} <span class="muted">— ${stories.length} stor${stories.length === 1 ? "y" : "ies"}</span>`;
+
+  if (!filtered.length) {
+    body.innerHTML = `<div class="labels-empty">No attributed labels for this book under the current filters.</div>`;
+    return;
+  }
+
+  if (state.booksView === "ranked") {
+    renderBooksRanked(filtered, stories, body);
+  } else {
+    renderBooksHeatmap(filtered, stories, body);
+  }
+}
+
+// Aggregate by (category, topic) across the given (already book-filtered)
+// label rows. Returns rows sorted by coverage desc, then avg hit rate desc.
+function aggregateBooksLabels(rows, totalStories) {
+  const byKey = new Map();
+  for (const r of rows) {
+    const key = `${r.category}\t${r.topic}`;
+    let agg = byKey.get(key);
+    if (!agg) {
+      agg = {
+        category: r.category,
+        topic: r.topic,
+        stories: new Set(),
+        hit_rate_sum: 0,
+        hit_rate_count: 0,
+      };
+      byKey.set(key, agg);
+    }
+    agg.stories.add(r.story);
+    const hitRate = r.total > 0 ? r.hits / r.total : 0;
+    agg.hit_rate_sum += hitRate;
+    agg.hit_rate_count += 1;
+  }
+  const out = [];
+  for (const a of byKey.values()) {
+    const coverage = totalStories > 0 ? a.stories.size / totalStories : 0;
+    const avg_hit_rate = a.hit_rate_count > 0 ? a.hit_rate_sum / a.hit_rate_count : 0;
+    out.push({
+      category: a.category,
+      topic: a.topic,
+      story_count: a.stories.size,
+      total_stories: totalStories,
+      coverage,
+      avg_hit_rate,
+    });
+  }
+  out.sort((a, b) => b.coverage - a.coverage || b.avg_hit_rate - a.avg_hit_rate);
+  return out;
+}
+
+function renderBooksRanked(rows, stories, body) {
+  const agg = aggregateBooksLabels(rows, stories.length);
+  const items = agg
+    .map((a) => {
+      const coveragePct = Math.round(a.coverage * 100);
+      const avgPct = Math.round(a.avg_hit_rate * 100);
+      return `<li class="books-bar-row" data-category="${escapeHtml(a.category)}" data-topic="${escapeHtml(a.topic)}" title="Open ${escapeHtml(a.category)} / ${escapeHtml(a.topic)} in Labels">
+        <div class="books-bar-label">
+          <span class="books-bar-cat" data-category="${escapeHtml(a.category)}">${escapeHtml(a.category)}</span>
+          <span class="books-bar-topic">${escapeHtml(a.topic)}</span>
+        </div>
+        <div class="books-bar-track" role="img" aria-label="${coveragePct}% coverage, ${avgPct}% average hit rate">
+          <div class="books-bar-fill" data-category="${escapeHtml(a.category)}" style="width: ${coveragePct}%"></div>
+        </div>
+        <div class="books-bar-stats mono">
+          <span class="books-bar-cov">${coveragePct}%</span>
+          <span class="muted">${a.story_count}/${a.total_stories} · avg ${avgPct}%</span>
+        </div>
+      </li>`;
+    })
+    .join("");
+  body.innerHTML = `<ol class="books-bar-list">${items}</ol>`;
+  for (const node of body.querySelectorAll(".books-bar-row")) {
+    node.addEventListener("click", () => {
+      drillToLabels(state.booksBookSelected, node.dataset.category, node.dataset.topic);
+    });
+  }
+}
+
+function renderBooksHeatmap(rows, stories, body) {
+  const agg = aggregateBooksLabels(rows, stories.length);
+  if (!agg.length) {
+    body.innerHTML = `<div class="labels-empty">Nothing to display.</div>`;
+    return;
+  }
+  // Column order: by ranked importance (same as view A). Row order:
+  // alphabetical for now — gives a stable, predictable layout. A future
+  // pass could sort rows by similarity to make clusters pop.
+  const cols = agg;
+  const rowsSorted = stories.slice().sort();
+  const cellByKey = new Map();
+  for (const r of rows) {
+    const key = `${r.story}\t${r.category}\t${r.topic}`;
+    const rate = r.total > 0 ? r.hits / r.total : 0;
+    // Same (story, label) may appear under multiple engines if the user has
+    // both selected — take the max so cells show the strongest signal.
+    const prev = cellByKey.get(key) || 0;
+    cellByKey.set(key, Math.max(prev, rate));
+  }
+
+  const headerCells = cols
+    .map((c) => {
+      return `<th class="books-heat-colhead" data-category="${escapeHtml(c.category)}" data-topic="${escapeHtml(c.topic)}" title="${escapeHtml(c.category)} / ${escapeHtml(c.topic)} — click to open in Labels">
+        <div class="books-heat-coltag" data-category="${escapeHtml(c.category)}">${escapeHtml(c.category)}</div>
+        <div class="books-heat-coltopic">${escapeHtml(c.topic)}</div>
+      </th>`;
+    })
+    .join("");
+
+  const bodyRows = rowsSorted
+    .map((story) => {
+      const cells = cols
+        .map((c) => {
+          const rate = cellByKey.get(`${story}\t${c.category}\t${c.topic}`) || 0;
+          const pct = Math.round(rate * 100);
+          // Intensity steps keep colors readable and the visual rhythm
+          // discrete — easier to see banding than a smooth gradient.
+          let intensity = "i0";
+          if (pct >= 75) intensity = "i4";
+          else if (pct >= 50) intensity = "i3";
+          else if (pct >= 25) intensity = "i2";
+          else if (pct > 0) intensity = "i1";
+          const title = pct > 0
+            ? `${escapeHtml(story)} — ${escapeHtml(c.category)} / ${escapeHtml(c.topic)}: ${pct}% hit`
+            : `${escapeHtml(story)} — no hit on ${escapeHtml(c.category)} / ${escapeHtml(c.topic)}`;
+          return `<td class="books-heat-cell ${intensity}" data-category="${escapeHtml(c.category)}" data-topic="${escapeHtml(c.topic)}" title="${title}"></td>`;
+        })
+        .join("");
+      return `<tr><th class="books-heat-rowhead" data-story="${escapeHtml(story)}">${escapeHtml(story)}</th>${cells}</tr>`;
+    })
+    .join("");
+
+  body.innerHTML = `<div class="books-heat-wrap"><table class="books-heat">
+    <thead><tr><th></th>${headerCells}</tr></thead>
+    <tbody>${bodyRows}</tbody>
+  </table></div>`;
+
+  // Column header click: filter Labels to (book, category, topic).
+  for (const node of body.querySelectorAll(".books-heat-colhead")) {
+    node.addEventListener("click", () => {
+      drillToLabels(state.booksBookSelected, node.dataset.category, node.dataset.topic);
+    });
+  }
+  // Cell click: same as column for now — the column carries the meaningful
+  // label. Cell-specific drill (book + story + label) is what the row label does.
+  for (const node of body.querySelectorAll(".books-heat-cell")) {
+    node.addEventListener("click", () => {
+      drillToLabels(state.booksBookSelected, node.dataset.category, node.dataset.topic);
+    });
+  }
+  // Row label click: open the existing story-detail view in Labels.
+  for (const node of body.querySelectorAll(".books-heat-rowhead")) {
+    node.addEventListener("click", () => {
+      drillToLabelsStory(state.booksBookSelected, node.dataset.story);
+    });
+  }
+}
+
+// Drill into Labels filtered to one (category, topic) for a book. Selects
+// the book in the Labels tree, expands it, and narrows the multi-selects to
+// just the target so the right pane shows that label's cards.
+function drillToLabels(book, category, topic) {
+  state.labelsBookSelected = book;
+  state.labelsStorySelected = null;
+  state.labelsBookExpanded.add(book);
+  // Mirror engine selection so the drill is consistent with what was visible.
+  if (state.booksEngine) {
+    state.labelsEngine = state.booksEngine;
+    document.getElementById("labels-engine").value = state.booksEngine;
+  }
+  setSingleChecked("labels-category", category);
+  setSingleChecked("labels-topic", topic);
+  switchTab("labels");
+  renderLabelsTree();
+  renderLabelsPaneBody();
+}
+
+// Drill into Labels at the story-detail view for one story in a book.
+function drillToLabelsStory(book, story) {
+  state.labelsBookSelected = book;
+  state.labelsStorySelected = story;
+  state.labelsBookExpanded.add(book);
+  if (state.booksEngine) {
+    state.labelsEngine = state.booksEngine;
+    document.getElementById("labels-engine").value = state.booksEngine;
+  }
+  // Don't narrow category/topic here — when reading a single story the user
+  // usually wants the full label spread.
+  setAllChecked("labels-category", true);
+  setAllChecked("labels-topic", true);
+  switchTab("labels");
+  renderLabelsTree();
+  renderLabelsPaneBody();
+}
+
+// Helper: tick exactly one checkbox in a multi-select list, untick all others.
+function setSingleChecked(containerId, value) {
+  let matched = false;
+  for (const el of document.querySelectorAll(`#${containerId} input[type="checkbox"]`)) {
+    const should = el.value === value;
+    el.checked = should;
+    if (should) matched = true;
+  }
+  // If the target value isn't present (shouldn't happen, but be safe), leave
+  // everything checked rather than leaving the user stranded with nothing.
+  if (!matched) {
+    setAllChecked(containerId, true);
+  }
+  updateDropdownSummary(containerId);
 }
 
 // ---------- Ranking tab ----------

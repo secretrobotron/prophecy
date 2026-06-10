@@ -11,6 +11,7 @@
     <h1>Prophecy Viewer</h1>
     <nav class="tabs">
       <button class="tab-button active" data-tab="labels">Labels</button>
+      <button class="tab-button" data-tab="books">Books</button>
       <button class="tab-button" data-tab="ranking">Ranking</button>
       <button class="tab-button" data-tab="prompts">Prompts</button>
       <button class="tab-button" data-tab="responses">Responses</button>
@@ -67,6 +68,43 @@
             </div>
           </div>
           <div id="labels-pane-body"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-books" class="tab-panel">
+      <div class="books-layout">
+        <aside class="books-tree" aria-label="Books">
+          <ul id="books-list" class="tree-root"></ul>
+        </aside>
+        <div class="books-pane">
+          <div class="books-toolbar">
+            <h2 id="books-pane-title" class="muted">Select a book</h2>
+            <div class="books-toolbar-controls">
+              <div class="books-view-toggle" role="tablist" aria-label="View">
+                <button type="button" class="books-view-btn active" data-view="ranked" role="tab" aria-selected="true">Ranked</button>
+                <button type="button" class="books-view-btn" data-view="heatmap" role="tab" aria-selected="false">Heatmap</button>
+              </div>
+              <div class="multi-dropdown" data-target="books-category">
+                <span class="multi-label">Category</span>
+                <button type="button" class="multi-toggle" aria-expanded="false" aria-haspopup="listbox">
+                  <span class="multi-summary">All</span>
+                  <span class="multi-chevron" aria-hidden="true">&#9662;</span>
+                </button>
+                <div class="multi-panel" hidden>
+                  <div class="multi-actions">
+                    <button type="button" data-target="books-category" data-action="all">all</button>
+                    <button type="button" data-target="books-category" data-action="none">none</button>
+                  </div>
+                  <div id="books-category" class="checkbox-list"></div>
+                </div>
+              </div>
+              <label class="books-engine-pick">Engine
+                <select id="books-engine"><option value="">(all)</option></select>
+              </label>
+            </div>
+          </div>
+          <div id="books-pane-body"></div>
         </div>
       </div>
     </section>

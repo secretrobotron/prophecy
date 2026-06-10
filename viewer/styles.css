@@ -1115,3 +1115,333 @@ footer {
   background: var(--row-hover);
   border-radius: 6px;
 }
+
+/* Books tab — per-book aggregate view with Ranked / Heatmap toggle. */
+.books-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 20px;
+  min-height: 600px;
+}
+
+.books-tree {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow-y: auto;
+  max-height: calc(100vh - 180px);
+  padding: 8px 6px;
+  font-size: 13px;
+}
+
+.books-tree .tree-root {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.books-list-item {
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.books-list-item:hover {
+  background: var(--row-hover);
+}
+
+.books-list-item.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.books-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.books-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.books-toolbar h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.books-toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.books-view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.books-view-btn {
+  background: transparent;
+  border: 0;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.books-view-btn + .books-view-btn {
+  border-left: 1px solid var(--border);
+}
+
+.books-view-btn:hover {
+  background: var(--row-hover);
+}
+
+.books-view-btn.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.books-engine-pick {
+  font-size: 13px;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.books-engine-pick select {
+  font-size: 13px;
+}
+
+/* Ranked view: bars sized by coverage, colored by category. */
+.books-bar-list {
+  list-style: none;
+  counter-reset: bar;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.books-bar-row {
+  display: grid;
+  grid-template-columns: 220px 1fr 160px;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.books-bar-row:hover {
+  background: var(--row-hover);
+}
+
+.books-bar-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.books-bar-cat {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--cat-default);
+  color: var(--cat-default-text);
+}
+
+.books-bar-cat[data-category="Babylonian"]  { background: var(--cat-babylonian);  color: var(--cat-babylonian-text); }
+.books-bar-cat[data-category="Hellenistic"] { background: var(--cat-hellenistic); color: var(--cat-hellenistic-text); }
+.books-bar-cat[data-category="Persian"]     { background: var(--cat-persian);     color: var(--cat-persian-text); }
+.books-bar-cat[data-category="Politics"]    { background: var(--cat-politics);    color: var(--cat-politics-text); }
+.books-bar-cat[data-category="Test"]        { background: var(--cat-test);        color: var(--cat-test-text); }
+
+.books-bar-topic {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.books-bar-track {
+  position: relative;
+  height: 14px;
+  background: var(--row-hover);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.books-bar-fill {
+  height: 100%;
+  background: var(--cat-default-text);
+  border-radius: 7px;
+  transition: width 200ms ease;
+}
+
+.books-bar-fill[data-category="Babylonian"]  { background: var(--cat-babylonian-text); }
+.books-bar-fill[data-category="Hellenistic"] { background: var(--cat-hellenistic-text); }
+.books-bar-fill[data-category="Persian"]     { background: var(--cat-persian-text); }
+.books-bar-fill[data-category="Politics"]    { background: var(--cat-politics-text); }
+.books-bar-fill[data-category="Test"]        { background: var(--cat-test-text); }
+
+.books-bar-stats {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--fg);
+}
+
+.books-bar-cov {
+  font-weight: 600;
+}
+
+/* Heatmap view: stories × labels grid, intensity-banded by hit rate. */
+.books-heat-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.books-heat {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+}
+
+.books-heat thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 1;
+  vertical-align: bottom;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.books-heat-colhead {
+  cursor: pointer;
+  white-space: nowrap;
+  min-width: 70px;
+  max-width: 120px;
+}
+
+.books-heat-colhead:hover {
+  background: var(--row-hover);
+}
+
+.books-heat-coltag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--cat-default);
+  color: var(--cat-default-text);
+}
+
+.books-heat-coltag[data-category="Babylonian"]  { background: var(--cat-babylonian);  color: var(--cat-babylonian-text); }
+.books-heat-coltag[data-category="Hellenistic"] { background: var(--cat-hellenistic); color: var(--cat-hellenistic-text); }
+.books-heat-coltag[data-category="Persian"]     { background: var(--cat-persian);     color: var(--cat-persian-text); }
+.books-heat-coltag[data-category="Politics"]    { background: var(--cat-politics);    color: var(--cat-politics-text); }
+.books-heat-coltag[data-category="Test"]        { background: var(--cat-test);        color: var(--cat-test-text); }
+
+.books-heat-coltopic {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
+  max-width: 110px;
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+.books-heat-rowhead {
+  position: sticky;
+  left: 0;
+  background: var(--bg);
+  padding: 4px 10px 4px 10px;
+  border-right: 1px solid var(--border);
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.books-heat-rowhead:hover {
+  background: var(--row-hover);
+}
+
+.books-heat tbody tr:nth-child(even) .books-heat-rowhead {
+  background: var(--row-hover);
+}
+
+.books-heat-cell {
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  background: transparent;
+}
+
+.books-heat-cell.i0 { background: transparent; }
+.books-heat-cell.i1 { background: var(--cat-default); opacity: 0.5; }
+.books-heat-cell.i2 { background: var(--cat-default); opacity: 0.75; }
+.books-heat-cell.i3 { background: var(--cat-default-text); opacity: 0.5; }
+.books-heat-cell.i4 { background: var(--cat-default-text); opacity: 0.85; }
+
+.books-heat-cell[data-category="Babylonian"].i1  { background: var(--cat-babylonian); opacity: 0.5; }
+.books-heat-cell[data-category="Babylonian"].i2  { background: var(--cat-babylonian); opacity: 0.8; }
+.books-heat-cell[data-category="Babylonian"].i3  { background: var(--cat-babylonian-text); opacity: 0.55; }
+.books-heat-cell[data-category="Babylonian"].i4  { background: var(--cat-babylonian-text); opacity: 0.85; }
+
+.books-heat-cell[data-category="Hellenistic"].i1 { background: var(--cat-hellenistic); opacity: 0.5; }
+.books-heat-cell[data-category="Hellenistic"].i2 { background: var(--cat-hellenistic); opacity: 0.8; }
+.books-heat-cell[data-category="Hellenistic"].i3 { background: var(--cat-hellenistic-text); opacity: 0.55; }
+.books-heat-cell[data-category="Hellenistic"].i4 { background: var(--cat-hellenistic-text); opacity: 0.85; }
+
+.books-heat-cell[data-category="Persian"].i1     { background: var(--cat-persian); opacity: 0.5; }
+.books-heat-cell[data-category="Persian"].i2     { background: var(--cat-persian); opacity: 0.8; }
+.books-heat-cell[data-category="Persian"].i3     { background: var(--cat-persian-text); opacity: 0.55; }
+.books-heat-cell[data-category="Persian"].i4     { background: var(--cat-persian-text); opacity: 0.85; }
+
+.books-heat-cell[data-category="Politics"].i1    { background: var(--cat-politics); opacity: 0.5; }
+.books-heat-cell[data-category="Politics"].i2    { background: var(--cat-politics); opacity: 0.8; }
+.books-heat-cell[data-category="Politics"].i3    { background: var(--cat-politics-text); opacity: 0.55; }
+.books-heat-cell[data-category="Politics"].i4    { background: var(--cat-politics-text); opacity: 0.85; }
+
+.books-heat-cell[data-category="Test"].i1        { background: var(--cat-test); opacity: 0.5; }
+.books-heat-cell[data-category="Test"].i2        { background: var(--cat-test); opacity: 0.8; }
+.books-heat-cell[data-category="Test"].i3        { background: var(--cat-test-text); opacity: 0.55; }
+.books-heat-cell[data-category="Test"].i4        { background: var(--cat-test-text); opacity: 0.85; }
+
+.books-heat-cell:hover {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  position: relative;
+  z-index: 1;
+}
