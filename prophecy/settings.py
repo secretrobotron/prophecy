@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import os
 import tomllib
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +42,19 @@ class Settings:
     # contamination) and the per-call cost is dominated by network/subprocess
     # latency, so a handful of parallel workers buys a lot of wall-clock back.
     workers: int = 3
+    # Default AI provider when --ai-provider isn't passed. Lets users pin
+    # their preferred backend in prophecy.toml (e.g. "ollama") instead of
+    # typing it every invocation.
+    ai_provider: str = "chatgpt"
+    # Per-provider configuration loaded from [providers.<name>] TOML tables.
+    # Example:
+    #     [providers.ollama]
+    #     model = "qwen2.5:14b-instruct"
+    #     base_url = "http://localhost:11434/v1"
+    # The pipeline merges this with CLI --model / --base-url overrides before
+    # constructing the provider — so the toml is the persistent default and
+    # the CLI is the per-run override.
+    providers: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         # Coerce strings (from TOML or env) to Path so consumers can rely
@@ -66,6 +79,11 @@ class Settings:
                 raise ValueError(f"workers must be an integer, got {self.workers!r}") from e
         if self.workers < 1:
             raise ValueError(f"workers must be >= 1, got {self.workers}")
+        if not isinstance(self.providers, dict):
+            raise ValueError(
+                f"providers must be a mapping of provider-name -> config dict, "
+                f"got {type(self.providers).__name__}"
+            )
 
     def resolve_cache_folder(self) -> Path:
         """Cache folder if set explicitly; otherwise ``data_folder / "results"``."""
@@ -89,6 +107,15 @@ class Settings:
         if self.stories_file.is_absolute():
             return self.stories_file
         return self.resolve_stories_folder() / self.stories_file
+
+    def provider_config(self, name: str) -> dict[str, Any]:
+        """Per-provider config from [providers.<name>], lower-cased lookup.
+
+        Returns an empty dict when nothing is configured for that name.
+        The returned dict is a shallow copy so callers can safely mutate /
+        merge with CLI overrides.
+        """
+        return dict(self.providers.get(name.lower(), {}))
 
     def resolve_prompts_folder(self) -> Path:
         """Prompts folder resolved against ``data_folder`` if relative."""
@@ -124,8 +151,12 @@ class Settings:
                 if key in field_names:
                     values[key] = value
 
-        # Layer 2: env vars (PROPHECY_DATA_FOLDER, PROPHECY_CACHE_FOLDER, …)
+        # Layer 2: env vars (PROPHECY_DATA_FOLDER, PROPHECY_CACHE_FOLDER, …).
+        # Nested-dict fields like `providers` aren't representable as a
+        # single env-var string, so they're skipped — TOML or kwargs only.
         for f in fields(cls):
+            if f.name == "providers":
+                continue
             env_value = os.environ.get(ENV_PREFIX + f.name.upper())
             if env_value is not None:
                 values[f.name] = env_value

@@ -372,11 +372,43 @@ def create_argument_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--ai-provider",
-        default="chatgpt",
-        choices=["chatgpt", "openai", "claude", "anthropic", "claude-cli", "local-claude"],
+        default=None,
+        choices=[
+            "chatgpt",
+            "openai",
+            "claude",
+            "anthropic",
+            "claude-cli",
+            "local-claude",
+            "ollama",
+            "local",
+        ],
         help=(
-            'AI provider to use (default: chatgpt). "claude-cli"/"local-claude" '
-            "shells out to the `claude` CLI and needs no API key."
+            "AI provider to use. Falls back to the `ai_provider` setting in "
+            "prophecy.toml (default chatgpt if unset). "
+            '"claude-cli"/"local-claude" shells out to the `claude` CLI; '
+            '"ollama"/"local" hits a local Ollama daemon (no API key).'
+        ),
+    )
+
+    parser.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "Override the provider's model for this run (e.g. "
+            "'qwen2.5:14b-instruct' for ollama, 'gpt-4o-mini' for chatgpt). "
+            "Per-provider defaults can also be set under [providers.<name>] "
+            "in prophecy.toml."
+        ),
+    )
+
+    parser.add_argument(
+        "--base-url",
+        default=None,
+        help=(
+            "Override the provider's base URL for this run. Mainly useful "
+            "for pointing the ollama provider at a non-default daemon "
+            "(default: http://localhost:11434/v1)."
         ),
     )
 
@@ -483,8 +515,17 @@ def validate_inputs(stories, prompts, args, logger: logging.Logger):
     return story_titles, prompt_list
 
 
-def initialize_ai_provider(args, logger: logging.Logger):
-    """Initialize AI provider if not in dry-run mode."""
+def initialize_ai_provider(args, settings: Settings, logger: logging.Logger):
+    """Initialize AI provider if not in dry-run mode.
+
+    Resolution order, highest precedence first:
+        --ai-provider CLI flag  >  settings.ai_provider  >  "chatgpt"
+        --model / --base-url    >  [providers.<name>] in toml  >  provider default
+        --api-key               >  provider's own env-var fallback
+
+    Falling through means a user can pin their provider + model in
+    prophecy.toml once and stop passing them on every invocation.
+    """
     if args.dry_run:
         return None
 
@@ -492,15 +533,19 @@ def initialize_ai_provider(args, logger: logging.Logger):
         logger.error("AI providers not available. Install 'openai' package or use --dry-run")
         sys.exit(1)
 
-    # Each provider falls back to its own env var when api_key is None,
-    # so only override with --api-key when the user explicitly supplied one.
-    factory_kwargs = {}
+    provider_name = args.ai_provider or settings.ai_provider
+    factory_kwargs = settings.provider_config(provider_name)
+
     if args.api_key:
         factory_kwargs["api_key"] = args.api_key
+    if args.model:
+        factory_kwargs["model"] = args.model
+    if args.base_url:
+        factory_kwargs["base_url"] = args.base_url
 
     try:
         ai_provider = AIProviderFactory.create_provider(
-            args.ai_provider,
+            provider_name,
             **factory_kwargs,
         )
 
@@ -705,7 +750,8 @@ def process_all_combinations(
     logger.info("=== Prophecy Processing ===")
     logger.info(f"Stories: {len(story_titles)}")
     logger.info(f"Prompts: {len(effective_prompts)}")
-    logger.info(f"Mode: {'Dry run' if args.dry_run else f'AI Provider: {args.ai_provider}'}")
+    effective_provider = args.ai_provider or settings.ai_provider
+    logger.info(f"Mode: {'Dry run' if args.dry_run else f'AI Provider: {effective_provider}'}")
 
     # Get cache folder (only used when not in dry-run mode)
     cache_folder = None
@@ -1772,11 +1818,12 @@ def main():
             cache_folder=args.cache_folder,
             stories_file=args.stories_file,
             workers=args.workers,
+            ai_provider=args.ai_provider,
         )
 
         stories, prompts, bible = initialize_components(settings, logger)
         story_titles, prompt_list = validate_inputs(stories, prompts, args, logger)
-        ai_provider = initialize_ai_provider(args, logger)
+        ai_provider = initialize_ai_provider(args, settings, logger)
         process_all_combinations(
             stories,
             prompts,
