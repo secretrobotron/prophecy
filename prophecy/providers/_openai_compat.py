@@ -26,7 +26,7 @@ from typing import Any
 import openai
 from openai import OpenAI
 
-from .base import AIProvider, AIProviderError
+from .base import AIProvider, AIProviderError, FatalAIProviderError
 
 
 class OpenAICompatProvider(AIProvider):
@@ -179,3 +179,47 @@ class OpenAICompatProvider(AIProvider):
         ):
             return False
         return True
+
+    def verify_model_available(self) -> list[str]:
+        """Ask the endpoint which models it serves; fail fast if ours isn't.
+
+        Hits ``GET /v1/models`` once at startup. If the configured
+        ``self.model`` isn't in the returned list, raises
+        ``FatalAIProviderError`` with the actual list of available models
+        in the message so the user can fix the typo without leaving the
+        terminal. This is the cheap way to catch the most common
+        misconfiguration (model name mismatch between toml and what's
+        deployed) before a multi-thousand-call batch starts hammering
+        the endpoint with rejected requests.
+
+        Returns the list of available model IDs from the endpoint on
+        success. Re-raises as a non-fatal AIProviderError if the request
+        itself fails (network, auth) — the caller can decide to skip the
+        check rather than abort.
+        """
+        try:
+            response = self.client.models.list()
+        except openai.APIConnectionError as e:
+            raise AIProviderError(f"{self._connection_hint(e)} ({e})") from e
+        except openai.AuthenticationError as e:
+            raise FatalAIProviderError(
+                f"{self.NAME} rejected the API key when listing models. "
+                f"Check the credential and retry. ({e})"
+            ) from e
+        except openai.APIError as e:
+            raise AIProviderError(f"{self.NAME} API error while listing models: {e}") from e
+
+        available = [m.id for m in response.data]
+        if self.model not in available:
+            sample = ", ".join(available[:5])
+            if len(available) > 5:
+                sample += f", … ({len(available)} total)"
+            raise FatalAIProviderError(
+                f"Model {self.model!r} is not served by the {self.NAME} "
+                f"endpoint at {self.base_url}. "
+                f"Available model{'s' if len(available) != 1 else ''}: "
+                f"{sample if available else '(none reported)'}. "
+                f"Fix the model name in [providers.{self.NAME}] or --model "
+                f"and retry — every call would otherwise fail the same way."
+            )
+        return available

@@ -6,7 +6,28 @@ from abc import ABC, abstractmethod
 
 
 class AIProviderError(Exception):
-    """Exception raised for AI provider errors."""
+    """Exception raised for AI provider errors.
+
+    The default semantics are *recoverable* — the calling pipeline catches
+    these per-call and continues processing the next item, so a single
+    transient hiccup doesn't kill an N-thousand-call batch. For failures
+    that mean every subsequent call would fail the same way (wrong model
+    name, bad auth, endpoint gone), raise ``FatalAIProviderError`` instead
+    so the worker pool aborts immediately.
+    """
+
+    pass
+
+
+class FatalAIProviderError(AIProviderError):
+    """Provider failure that every subsequent call would hit the same way.
+
+    Raised for things like "the configured model isn't loaded on the
+    endpoint" or "the API key is unauthorized" — situations where
+    continuing would just burn through compute generating identical
+    errors. Callers in the batch pipeline catch this distinctly from
+    plain ``AIProviderError`` and abort the run with a clear message.
+    """
 
     pass
 

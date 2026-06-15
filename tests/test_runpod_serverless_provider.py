@@ -14,6 +14,7 @@ import pytest
 from prophecy.providers import (
     AIProviderError,
     AIProviderFactory,
+    FatalAIProviderError,
     RunPodServerlessProvider,
 )
 
@@ -256,3 +257,124 @@ class TestRunPodFromTomlConfig:
         assert kw["api_key"] == "rpa_from_toml"
         assert kw["base_url"] == "https://api.runpod.ai/v2/abc-from-toml/openai/v1"
         assert kw["timeout"] == 120
+
+
+class TestVerifyModelAvailable:
+    """The /v1/models pre-flight check that catches name mismatches
+    before a batch run starts wasting compute on rejected calls.
+    Lives on the shared OpenAICompatProvider base so it covers ollama too,
+    but the motivating bug was a RunPod deploy serving a different model
+    than the toml specified."""
+
+    def _models_response(self, model_ids):
+        """Build a mock matching the openai SDK's Page[Model] shape."""
+        return Mock(data=[Mock(id=mid) for mid in model_ids])
+
+    def test_success_returns_available_models(self):
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch(OPENAI_PATCH) as mock_openai,
+        ):
+            mock_client = Mock()
+            mock_client.models.list.return_value = self._models_response(
+                ["Qwen/Qwen2.5-14B-Instruct", "other/model"]
+            )
+            mock_openai.return_value = mock_client
+            p = RunPodServerlessProvider(
+                api_key="k",
+                endpoint_id="abc",
+                model="Qwen/Qwen2.5-14B-Instruct",
+            )
+            available = p.verify_model_available()
+            assert "Qwen/Qwen2.5-14B-Instruct" in available
+
+    def test_missing_model_raises_fatal_with_actual_list(self):
+        """The exact failure mode that hid behind RunPod's 500 in
+        production — endpoint serves 'qwen/qwen2.5-7b-instruct' while
+        config asks for 'Qwen/Qwen2.5-14B-Instruct'. Error must surface
+        the served name so the user can fix immediately."""
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch(OPENAI_PATCH) as mock_openai,
+        ):
+            mock_client = Mock()
+            mock_client.models.list.return_value = self._models_response(
+                ["qwen/qwen2.5-7b-instruct"]
+            )
+            mock_openai.return_value = mock_client
+            p = RunPodServerlessProvider(
+                api_key="k",
+                endpoint_id="abc",
+                model="Qwen/Qwen2.5-14B-Instruct",
+            )
+            with pytest.raises(FatalAIProviderError) as exc:
+                p.verify_model_available()
+            assert "Qwen/Qwen2.5-14B-Instruct" in str(exc.value)
+            assert "qwen/qwen2.5-7b-instruct" in str(exc.value)
+
+    def test_truncates_long_model_list(self):
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch(OPENAI_PATCH) as mock_openai,
+        ):
+            many = [f"served-model-{i}" for i in range(12)]
+            mock_client = Mock()
+            mock_client.models.list.return_value = self._models_response(many)
+            mock_openai.return_value = mock_client
+            p = RunPodServerlessProvider(api_key="k", endpoint_id="abc", model="not-served")
+            with pytest.raises(FatalAIProviderError) as exc:
+                p.verify_model_available()
+            # Show first few, plus a "N total" hint so the user knows the
+            # list was clipped rather than being only 5 entries long.
+            assert "12 total" in str(exc.value)
+
+    def test_connection_error_is_non_fatal(self):
+        """Network blip while *checking* shouldn't kill the run — let the
+        caller decide. Real per-call retries cover the same surface."""
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch(OPENAI_PATCH) as mock_openai,
+        ):
+            mock_client = Mock()
+            mock_client.models.list.side_effect = openai.APIConnectionError(request=Mock())
+            mock_openai.return_value = mock_client
+            p = RunPodServerlessProvider(api_key="k", endpoint_id="abc")
+            with pytest.raises(AIProviderError) as exc:
+                p.verify_model_available()
+            assert not isinstance(exc.value, FatalAIProviderError)
+
+    def test_authentication_error_is_fatal(self):
+        """Bad API key affects every subsequent call, not just the check —
+        fatal so the user fixes the credential before paying for retries."""
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch(OPENAI_PATCH) as mock_openai,
+        ):
+            mock_client = Mock()
+            mock_client.models.list.side_effect = openai.AuthenticationError(
+                message="bad key",
+                response=Mock(status_code=401, headers={}),
+                body=None,
+            )
+            mock_openai.return_value = mock_client
+            p = RunPodServerlessProvider(api_key="k", endpoint_id="abc")
+            with pytest.raises(FatalAIProviderError):
+                p.verify_model_available()
+
+    def test_factory_propagates_fatal_unwrapped(self):
+        """The factory normally wraps construction exceptions in a generic
+        AIProviderError. The fatal subclass must pass through so callers
+        can distinguish it; otherwise the pipeline keeps retrying."""
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch(OPENAI_PATCH) as mock_openai,
+        ):
+
+            class _BadInit(RunPodServerlessProvider):
+                def __init__(self, *a, **kw):
+                    raise FatalAIProviderError("bad")
+
+            AIProviderFactory.register_provider("test-fatal", _BadInit)
+            mock_openai.return_value = Mock()
+            with pytest.raises(FatalAIProviderError):
+                AIProviderFactory.create_provider("test-fatal", api_key="k", endpoint_id="x")

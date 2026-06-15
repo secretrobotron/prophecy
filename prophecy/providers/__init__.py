@@ -3,13 +3,14 @@ AI provider package for Prophecy.
 
 Public surface:
 - AIProvider — abstract base
-- AIProviderError — exception type
+- AIProviderError — recoverable per-call failure (pipeline continues)
+- FatalAIProviderError — failure that affects every call (pipeline aborts)
 - ChatGPTProvider, ClaudeProvider, ClaudeCLIProvider, OllamaProvider,
   RunPodServerlessProvider — concrete providers
 - AIProviderFactory — builds providers by name
 """
 
-from .base import AIProvider, AIProviderError
+from .base import AIProvider, AIProviderError, FatalAIProviderError
 from .chatgpt import ChatGPTProvider
 from .claude_api import ClaudeProvider
 from .claude_cli import ClaudeCLIProvider
@@ -65,6 +66,11 @@ class AIProviderFactory:
 
         try:
             return provider_class(**kwargs)
+        except AIProviderError:
+            # Already a typed provider error (including FatalAIProviderError) —
+            # let it propagate untouched so the fatal vs recoverable
+            # distinction survives the factory.
+            raise
         except Exception as e:
             raise AIProviderError(f"Failed to create {provider_name} provider: {str(e)}") from e
 
@@ -94,6 +100,7 @@ __all__ = [
     "ChatGPTProvider",
     "ClaudeProvider",
     "ClaudeCLIProvider",
+    "FatalAIProviderError",
     "OllamaProvider",
     "RunPodServerlessProvider",
 ]

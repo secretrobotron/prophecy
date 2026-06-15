@@ -23,7 +23,7 @@ from .stories import Stories
 
 # Try to import AI providers (optional if openai not available)
 try:
-    from .providers import AIProviderError, AIProviderFactory
+    from .providers import AIProviderError, AIProviderFactory, FatalAIProviderError
 
     AI_PROVIDERS_AVAILABLE = True
 except ImportError:
@@ -435,6 +435,18 @@ def create_argument_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--skip-model-check",
+        action="store_true",
+        help=(
+            "Skip the GET /v1/models check that runs at startup for "
+            "OpenAI-compatible providers (ollama, runpod). The check "
+            "catches misconfigured model names before they waste a batch "
+            "run, but can be skipped for endpoints that don't implement "
+            "/v1/models or when you want to start instantly."
+        ),
+    )
+
+    parser.add_argument(
         "--verbosity",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
@@ -572,8 +584,37 @@ def initialize_ai_provider(args, settings: Settings, logger: logging.Logger):
             logger.error("AI provider configuration is invalid")
             sys.exit(1)
 
+        # Where supported, ask the endpoint which models it serves and
+        # bail now if our configured model isn't one of them. Catches the
+        # most common misconfiguration (model name typo, wrong size, or
+        # stale toml after redeploying) before any batch wastes
+        # compute hammering the endpoint with rejected calls. Skippable
+        # in case the endpoint doesn't implement /v1/models or is too
+        # slow to query.
+        if not args.skip_model_check and hasattr(ai_provider, "verify_model_available"):
+            logger.debug(
+                f"Verifying model {getattr(ai_provider, 'model', '?')!r} "
+                f"is served by {provider_name}…"
+            )
+            try:
+                ai_provider.verify_model_available()
+            except FatalAIProviderError as e:
+                logger.error(f"{e}")
+                sys.exit(1)
+            except AIProviderError as e:
+                # Network/auth issue while *checking* — don't kill the run
+                # over a flaky probe, just warn and let the real calls
+                # surface a fresh error if the problem persists.
+                logger.warning(
+                    f"Skipping model-availability check ({e}). "
+                    f"Use --skip-model-check to suppress this."
+                )
+
         return ai_provider
 
+    except FatalAIProviderError as e:
+        logger.error(f"{e}")
+        sys.exit(1)
     except (ValueError, AIProviderError) as e:
         logger.error(f"Failed to initialize AI provider: {e}")
         if "API key" in str(e):
@@ -726,6 +767,11 @@ def process_combination(
                     logger.error(f"Error processing JSON response: {e}")
                     return False
 
+            except FatalAIProviderError:
+                # Fatal: re-raise so the worker pool unwinds and the run
+                # aborts instead of burning through thousands of identical
+                # failures. Top-level catches this and exits cleanly.
+                raise
             except AIProviderError as e:
                 logger.error(f"AI provider failed: {e}")
                 logger.debug("Skipping this combination...")
@@ -880,6 +926,14 @@ def process_all_combinations(
                 name = "?"
                 try:
                     name = fut.result()
+                except FatalAIProviderError:
+                    # Stop accepting new work and let the pool drain
+                    # naturally. In-flight calls finish, queued ones
+                    # cancel. Re-raise so main() reports the error and
+                    # exits non-zero instead of pretending success.
+                    for pending in futures:
+                        pending.cancel()
+                    raise
                 except Exception as e:
                     logger.error(f"Worker error on combination #{idx + 1}: {e}")
                 with completed_lock:
@@ -1859,6 +1913,15 @@ def main():
     except KeyboardInterrupt:
         logger.info("Aborted by user")
         sys.exit(130)
+    except FatalAIProviderError as e:
+        # Distinct exit code so wrapping scripts can tell "the model name
+        # was wrong" apart from generic crashes. The message itself was
+        # already useful (printed by initialize_ai_provider when caught
+        # there, or by the in-flight handler when caught mid-batch); we
+        # echo at error level here so users running with default verbosity
+        # always see it.
+        logger.error(f"Aborted: {e}")
+        sys.exit(2)
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
         sys.exit(1)

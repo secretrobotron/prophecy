@@ -662,10 +662,43 @@ class TestAIProviderFactory:
             AIProviderFactory.create_provider("unsupported")
 
     def test_create_provider_initialization_failure(self):
-        """Test that provider initialization failure is handled."""
+        """Provider init errors surface as AIProviderError.
+
+        Provider-typed errors (AIProviderError and subclasses) pass through
+        the factory unchanged so the original message survives without
+        being double-wrapped. Non-typed exceptions still get the factory's
+        generic 'Failed to create <name>' wrap.
+        """
+        # Path 1: ChatGPTProvider's own try/except catches the SDK
+        # constructor failure and re-raises as
+        # AIProviderError("Failed to initialize OpenAI client: ..."),
+        # which now flows through the factory untouched.
         with patch("prophecy.providers.chatgpt.OpenAI", side_effect=Exception("Init failed")):
-            with pytest.raises(AIProviderError, match="Failed to create chatgpt provider"):
+            with pytest.raises(AIProviderError, match="Failed to initialize OpenAI client"):
                 AIProviderFactory.create_provider("chatgpt", api_key="test_key")
+
+        # Path 2: an untyped exception raised straight from __init__ still
+        # gets the factory's generic wrap.
+        original = AIProviderFactory._providers.copy()
+        try:
+
+            class _BadInit(AIProvider):
+                NAME = "test-bad"
+
+                def __init__(self, **_):
+                    raise RuntimeError("constructor exploded")
+
+                def post_prompt(self, *_, **__):
+                    return ""
+
+                def validate_configuration(self):
+                    return True
+
+            AIProviderFactory.register_provider("test-bad", _BadInit)
+            with pytest.raises(AIProviderError, match="Failed to create test-bad provider"):
+                AIProviderFactory.create_provider("test-bad")
+        finally:
+            AIProviderFactory._providers = original
 
     def test_get_available_providers(self):
         """Test getting list of available providers."""
