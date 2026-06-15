@@ -31,9 +31,9 @@ def _read_rows(path: Path) -> list[list[str]]:
 
 @pytest.fixture(scope="module")
 def prompt_files() -> list[Path]:
+    # No filename is mandatory — any prompts*.tsv counts — but at least
+    # one file with some data must exist or the pipeline has nothing to do.
     assert PROMPT_FILES, f"No prompts*.tsv files found under {PROMPTS_DIR}"
-    # The main file is mandatory; everything else is opt-in.
-    assert (PROMPTS_DIR / "prompts.tsv") in PROMPT_FILES, "prompts.tsv must exist"
     return PROMPT_FILES
 
 

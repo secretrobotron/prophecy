@@ -88,10 +88,13 @@ $text"""
         with pytest.raises(FileNotFoundError, match="Data folder not found"):
             Prompts("/nonexistent/path")
 
-    def test_init_missing_prompts_file(self, temp_data_folder):
-        """Test Prompts initialization with missing prompts.tsv."""
-        os.remove(Path(temp_data_folder) / "prompts" / "prompts.tsv")
-        with pytest.raises(FileNotFoundError, match="Prompts file not found"):
+    def test_init_no_prompt_files(self, temp_data_folder):
+        """When the prompts folder has no prompts*.tsv files at all,
+        construction fails fast — the pipeline has nothing to do."""
+        prompts_dir = Path(temp_data_folder) / "prompts"
+        for f in prompts_dir.glob("prompts*.tsv"):
+            f.unlink()
+        with pytest.raises(FileNotFoundError, match="No prompts\\*.tsv files found"):
             Prompts(temp_data_folder)
 
     def test_init_missing_template_file(self, temp_data_folder):

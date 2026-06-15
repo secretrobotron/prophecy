@@ -32,16 +32,16 @@ class Prompts:
         Args:
             data_folder: Path to the data folder. If None, falls back to
                 ``Settings.load()``.
-            prompts_folder: Subfolder under ``data_folder`` containing
-                ``prompts.tsv`` (required), any number of auxiliary
-                ``prompts.<name>.tsv`` files, and ``template.txt``.
+            prompts_folder: Subfolder under ``data_folder`` containing one
+                or more ``prompts*.tsv`` files plus ``template.txt``.
                 Default ``prompts``. If None, falls back to
                 ``Settings.load().prompts_folder``.
 
-        Auxiliary prompt files let contributors keep topical prompt sets
-        (e.g. ``prompts.politics.tsv``) in their own files. All matching
-        ``prompts*.tsv`` files are merged on load, with IDs required to be
-        globally unique across the set.
+        Contributors can keep topical prompt sets in their own files
+        (e.g. ``prompts.politics.tsv``, ``prompts.persian.tsv``). All
+        ``prompts*.tsv`` files in the folder are merged on load — IDs
+        must be globally unique across the set. At least one file with
+        at least one data row is required.
         """
         settings = Settings.load(
             data_folder=data_folder,
@@ -55,12 +55,13 @@ class Prompts:
         if not self.prompts_folder.exists():
             raise FileNotFoundError(f"Prompts folder not found: {self.prompts_folder}")
 
-        # The main prompts.tsv is required; auxiliary prompts.<name>.tsv
-        # files are picked up automatically when present.
-        self.prompts_path = self.prompts_folder / "prompts.tsv"
-        if not self.prompts_path.exists():
-            raise FileNotFoundError(f"Prompts file not found: {self.prompts_path}")
         self.prompts_paths: list[Path] = self._discover_prompt_files()
+        if not self.prompts_paths:
+            raise FileNotFoundError(f"No prompts*.tsv files found in {self.prompts_folder}")
+        # Backwards-compat alias: callers that used to read .prompts_path
+        # (the singular "main" file) get the first discovered file. New
+        # code should iterate .prompts_paths instead.
+        self.prompts_path = self.prompts_paths[0]
 
         # Load the template.txt file
         self.template_path = self.prompts_folder / "template.txt"
@@ -76,9 +77,14 @@ class Prompts:
             self._template_content = f.read()
 
     def _discover_prompt_files(self) -> list[Path]:
-        """Return the main prompts.tsv first, then auxiliary prompts.*.tsv files sorted by name."""
-        aux = sorted(p for p in self.prompts_folder.glob("prompts.*.tsv") if p != self.prompts_path)
-        return [self.prompts_path, *aux]
+        """Return every ``prompts*.tsv`` in the folder, sorted by name.
+
+        Sort key is the filename so the ID-uniqueness check fires
+        deterministically and error messages stay reproducible. The bare
+        ``prompts.tsv`` (no infix) naturally sorts before any
+        ``prompts.<name>.tsv`` because '.' < any letter.
+        """
+        return sorted(self.prompts_folder.glob("prompts*.tsv"))
 
     def _load_prompts(self):
         """Load and merge prompts data from every discovered TSV, enforcing global ID uniqueness."""
