@@ -151,11 +151,28 @@ For project-local config, create `prophecy.toml` in the repo root
 ```toml
 data_folder = "data"
 cache_folder = "results"
+ai_provider = "ollama"           # default backend; overridable with --ai-provider
+workers = 1
+
+# Per-provider config under [providers.<name>]. CLI flags
+# (--model, --base-url, --endpoint-id) override these for the run.
+[providers.ollama]
+model = "qwen2.5:14b-instruct"
+
+[providers.runpod]
+endpoint_id = "your-endpoint-id"
+model = "Qwen/Qwen2.5-14B-Instruct"
+timeout = 180                    # cold starts can take 30-60s
+
+[providers.chatgpt]
+model = "gpt-4o-mini"
 ```
 
-API keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) are deliberately *not*
-managed by `Settings` — providers read them from the environment so
-secrets don't end up in TOML files.
+API keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `RUNPOD_API_KEY`) are
+deliberately *not* managed by `Settings` — providers read them from the
+environment so secrets don't end up in TOML files. RunPod also accepts
+`RUNPOD_ENDPOINT_ID` from the environment when you don't want to commit
+it.
 
 ## Quick Start
 

@@ -382,12 +382,16 @@ def create_argument_parser() -> argparse.ArgumentParser:
             "local-claude",
             "ollama",
             "local",
+            "runpod",
+            "runpod-serverless",
         ],
         help=(
             "AI provider to use. Falls back to the `ai_provider` setting in "
             "prophecy.toml (default chatgpt if unset). "
             '"claude-cli"/"local-claude" shells out to the `claude` CLI; '
-            '"ollama"/"local" hits a local Ollama daemon (no API key).'
+            '"ollama"/"local" hits a local Ollama daemon (no API key); '
+            '"runpod"/"runpod-serverless" hits a RunPod Serverless vLLM '
+            "endpoint (needs RUNPOD_API_KEY + endpoint_id)."
         ),
     )
 
@@ -396,9 +400,9 @@ def create_argument_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Override the provider's model for this run (e.g. "
-            "'qwen2.5:14b-instruct' for ollama, 'gpt-4o-mini' for chatgpt). "
-            "Per-provider defaults can also be set under [providers.<name>] "
-            "in prophecy.toml."
+            "'qwen2.5:14b-instruct' for ollama, 'Qwen/Qwen2.5-14B-Instruct' "
+            "for runpod, 'gpt-4o-mini' for chatgpt). Per-provider defaults "
+            "can also be set under [providers.<name>] in prophecy.toml."
         ),
     )
 
@@ -406,9 +410,21 @@ def create_argument_parser() -> argparse.ArgumentParser:
         "--base-url",
         default=None,
         help=(
-            "Override the provider's base URL for this run. Mainly useful "
-            "for pointing the ollama provider at a non-default daemon "
-            "(default: http://localhost:11434/v1)."
+            "Override the provider's base URL for this run. Useful for "
+            "pointing ollama at a non-default daemon, or runpod at a "
+            "custom domain. For RunPod, prefer --endpoint-id which builds "
+            "the URL for you."
+        ),
+    )
+
+    parser.add_argument(
+        "--endpoint-id",
+        default=None,
+        help=(
+            "RunPod Serverless endpoint ID. Combined with the standard "
+            "https://api.runpod.ai/v2/<id>/openai/v1 template to form the "
+            "base URL. Can also be set as [providers.runpod] endpoint_id in "
+            "prophecy.toml or via RUNPOD_ENDPOINT_ID."
         ),
     )
 
@@ -519,9 +535,10 @@ def initialize_ai_provider(args, settings: Settings, logger: logging.Logger):
     """Initialize AI provider if not in dry-run mode.
 
     Resolution order, highest precedence first:
-        --ai-provider CLI flag  >  settings.ai_provider  >  "chatgpt"
-        --model / --base-url    >  [providers.<name>] in toml  >  provider default
-        --api-key               >  provider's own env-var fallback
+        --ai-provider CLI flag           >  settings.ai_provider  >  "chatgpt"
+        --model / --base-url / --endpoint-id
+                                         >  [providers.<name>] in toml  >  provider default
+        --api-key                        >  provider's own env-var fallback
 
     Falling through means a user can pin their provider + model in
     prophecy.toml once and stop passing them on every invocation.
@@ -542,6 +559,8 @@ def initialize_ai_provider(args, settings: Settings, logger: logging.Logger):
         factory_kwargs["model"] = args.model
     if args.base_url:
         factory_kwargs["base_url"] = args.base_url
+    if args.endpoint_id:
+        factory_kwargs["endpoint_id"] = args.endpoint_id
 
     try:
         ai_provider = AIProviderFactory.create_provider(
@@ -559,7 +578,8 @@ def initialize_ai_provider(args, settings: Settings, logger: logging.Logger):
         logger.error(f"Failed to initialize AI provider: {e}")
         if "API key" in str(e):
             logger.error(
-                "Set the appropriate API key env var (OPENAI_API_KEY or ANTHROPIC_API_KEY) or pass --api-key"
+                "Set the appropriate API key env var (OPENAI_API_KEY, "
+                "ANTHROPIC_API_KEY, RUNPOD_API_KEY) or pass --api-key"
             )
         sys.exit(1)
 
