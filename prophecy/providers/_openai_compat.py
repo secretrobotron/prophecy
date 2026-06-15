@@ -41,7 +41,16 @@ class OpenAICompatProvider(AIProvider):
     # empty for services that genuinely require a key.
     DEFAULT_API_KEY_PLACEHOLDER: str = ""
 
-    DEFAULT_MAX_TOKENS: int = 1000
+    # 500 is plenty for our JSON output ({answer, reason, certainty} — the
+    # reason field is typically a 2-3 sentence paragraph ~100 tokens). The
+    # reason it's not larger: most self-hosted / serverless OpenAI-compat
+    # endpoints run smaller-context models (Qwen 2.5's 32K, Llama 3's 8K)
+    # and the prompts include Hebrew Masoretic passages that already eat
+    # most of the context window. Leaving max_tokens at OpenAI's 1000
+    # default would push long-passage stories over the model's context
+    # limit. Users with bigger-context models can override via
+    # ``[providers.<name>] max_tokens = ...`` in prophecy.toml.
+    DEFAULT_MAX_TOKENS: int = 500
     # Lower than OpenAI's default — judgment tasks shouldn't be creative.
     DEFAULT_TEMPERATURE: float = 0.2
     # None lets the OpenAI client pick its own default (currently 600s).
@@ -161,6 +170,21 @@ class OpenAICompatProvider(AIProvider):
         except openai.NotFoundError as e:
             raise AIProviderError(f"{self._not_found_hint(model, e)} ({e})") from e
         except openai.APIError as e:
+            # Context-length errors come back as a 400 BadRequestError with
+            # 'maximum context length' or 'context_length_exceeded' in the
+            # body. Translate to a focused message so the user can see
+            # immediately which lever to pull (shorten prompt, bigger
+            # model, lower max_tokens) instead of squinting at a 500-line
+            # error body.
+            msg = str(e)
+            lower = msg.lower()
+            if "maximum context length" in lower or "context_length_exceeded" in lower:
+                raise AIProviderError(
+                    f"{self.NAME}: prompt exceeded the model's context "
+                    f"window. Lower max_tokens in [providers.{self.NAME}], "
+                    f"deploy a larger-context model, or skip the offending "
+                    f"story. Server said: {msg}"
+                ) from e
             raise AIProviderError(f"{self.NAME} API error: {e}") from e
         except Exception as e:
             raise AIProviderError(f"Unexpected error talking to {self.NAME}: {e}") from e

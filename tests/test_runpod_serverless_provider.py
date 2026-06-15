@@ -174,6 +174,34 @@ class TestRunPodPostPrompt:
             with pytest.raises(AIProviderError, match="not loaded"):
                 provider.post_prompt("Test")
 
+    def test_context_length_exceeded_message_is_focused(self):
+        """Hebrew Masoretic passages can be many thousands of tokens; the
+        server's 400 body is huge and buries the actual problem. Our
+        translator surfaces the 'context window' phrase and points at
+        the right config knob so the user can fix it in seconds."""
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch(OPENAI_PATCH) as mock_openai,
+        ):
+            mock_client = Mock()
+            server_body = (
+                "Error during inference: This model's maximum context "
+                "length is 32768 tokens. However, you requested 1000 output "
+                "tokens and your prompt contains at least 31769 input tokens"
+            )
+            mock_client.chat.completions.create.side_effect = openai.BadRequestError(
+                message=server_body,
+                response=Mock(status_code=400, headers={}),
+                body=None,
+            )
+            mock_openai.return_value = mock_client
+            provider = RunPodServerlessProvider(api_key="k", endpoint_id="abc")
+            with pytest.raises(AIProviderError, match="context window") as exc:
+                provider.post_prompt("Test")
+            assert "max_tokens" in str(exc.value)
+            # Original server message is preserved for diagnostics.
+            assert "32768" in str(exc.value)
+
 
 class TestRunPodEngineId:
     def test_engine_id_includes_model(self):
