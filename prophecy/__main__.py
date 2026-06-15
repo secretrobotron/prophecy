@@ -574,6 +574,8 @@ def initialize_ai_provider(args, settings: Settings, logger: logging.Logger):
     if args.endpoint_id:
         factory_kwargs["endpoint_id"] = args.endpoint_id
 
+    logger.info(f"Initializing AI provider: {provider_name}")
+
     try:
         ai_provider = AIProviderFactory.create_provider(
             provider_name,
@@ -584,6 +586,16 @@ def initialize_ai_provider(args, settings: Settings, logger: logging.Logger):
             logger.error("AI provider configuration is invalid")
             sys.exit(1)
 
+        # Show what we're actually about to call so the user can spot a
+        # config mismatch at a glance. base_url is only set on the
+        # OpenAI-compatible providers (ollama, runpod).
+        model = getattr(ai_provider, "model", None)
+        base_url = getattr(ai_provider, "base_url", None)
+        if model:
+            logger.info(f"  model:    {model}")
+        if base_url:
+            logger.info(f"  endpoint: {base_url}")
+
         # Where supported, ask the endpoint which models it serves and
         # bail now if our configured model isn't one of them. Catches the
         # most common misconfiguration (model name typo, wrong size, or
@@ -592,12 +604,15 @@ def initialize_ai_provider(args, settings: Settings, logger: logging.Logger):
         # in case the endpoint doesn't implement /v1/models or is too
         # slow to query.
         if not args.skip_model_check and hasattr(ai_provider, "verify_model_available"):
-            logger.debug(
-                f"Verifying model {getattr(ai_provider, 'model', '?')!r} "
-                f"is served by {provider_name}…"
+            # Bumped from DEBUG to INFO: this call can hang for 30-60s on
+            # a cold serverless endpoint, and silence at default verbosity
+            # made it look like prophecy itself had stalled.
+            logger.info(
+                f"Verifying model {model!r} is served by the endpoint "
+                f"(may take up to a minute on a cold serverless worker)…"
             )
             try:
-                ai_provider.verify_model_available()
+                available = ai_provider.verify_model_available()
             except FatalAIProviderError as e:
                 logger.error(f"{e}")
                 sys.exit(1)
@@ -608,6 +623,13 @@ def initialize_ai_provider(args, settings: Settings, logger: logging.Logger):
                 logger.warning(
                     f"Skipping model-availability check ({e}). "
                     f"Use --skip-model-check to suppress this."
+                )
+            else:
+                # Confirm what the endpoint actually reports so the user
+                # can see the check succeeded and verify casing matches.
+                logger.info(
+                    f"  verified: endpoint reports {len(available)} "
+                    f"served model{'s' if len(available) != 1 else ''}"
                 )
 
         return ai_provider
