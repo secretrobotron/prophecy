@@ -224,3 +224,35 @@ class TestRunPodFactoryRegistration:
             assert kw["base_url"] == "https://api.runpod.ai/v2/abc/openai/v1"
             assert kw["api_key"] == "k"
             assert kw["timeout"] == 30
+
+
+class TestRunPodFromTomlConfig:
+    """End-to-end: Settings reads [providers.runpod] from prophecy.toml and
+    the values (including api_key) reach the OpenAI client unmodified."""
+
+    def test_api_key_flows_from_toml_via_settings(self, tmp_path):
+        from prophecy.settings import Settings
+
+        toml = tmp_path / "prophecy.toml"
+        toml.write_text(
+            'ai_provider = "runpod"\n'
+            "[providers.runpod]\n"
+            'api_key = "rpa_from_toml"\n'
+            'endpoint_id = "abc-from-toml"\n'
+            'model = "Qwen/Qwen2.5-7B-Instruct"\n'
+            "timeout = 120\n",
+            encoding="utf-8",
+        )
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch(OPENAI_PATCH) as mock_openai,
+        ):
+            settings = Settings.load(config_path=toml)
+            # Mirror what initialize_ai_provider does in __main__.py — the
+            # factory consumes provider_config(name) directly.
+            kwargs = settings.provider_config(settings.ai_provider)
+            AIProviderFactory.create_provider(settings.ai_provider, **kwargs)
+        kw = mock_openai.call_args.kwargs
+        assert kw["api_key"] == "rpa_from_toml"
+        assert kw["base_url"] == "https://api.runpod.ai/v2/abc-from-toml/openai/v1"
+        assert kw["timeout"] == 120

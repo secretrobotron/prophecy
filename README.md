@@ -168,11 +168,18 @@ timeout = 180                    # cold starts can take 30-60s
 model = "gpt-4o-mini"
 ```
 
-API keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `RUNPOD_API_KEY`) are
-deliberately *not* managed by `Settings` — providers read them from the
-environment so secrets don't end up in TOML files. RunPod also accepts
-`RUNPOD_ENDPOINT_ID` from the environment when you don't want to commit
-it.
+API keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `RUNPOD_API_KEY`) and
+the RunPod endpoint ID (`RUNPOD_ENDPOINT_ID`) can be set either via
+environment variables *or* under `[providers.<name>]` in `prophecy.toml`.
+Pick by context:
+
+- **Environment variables** are safer when the toml is committed,
+  shared with collaborators, or copied between machines — the secret
+  never sits in a file on disk.
+- **TOML `api_key`/`endpoint_id`** is convenient when `prophecy.toml`
+  is gitignored (the default) and stays local. Resolution order is
+  `--api-key` CLI flag → `[providers.<name>] api_key` in toml →
+  `<PROVIDER>_API_KEY` env var → hard error.
 
 ## Quick Start
 

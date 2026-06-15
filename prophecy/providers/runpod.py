@@ -14,9 +14,11 @@ two reasons:
    cache), so the default request timeout is bumped and error messages
    explain why a hang is plausible rather than indicating a real failure.
 
-The API key is read from ``RUNPOD_API_KEY`` by default — never put it in
-``prophecy.toml`` if the file is committed. CLI ``--api-key`` and the
-explicit ``api_key`` constructor argument still work for ad-hoc use.
+The API key resolves in this order: explicit ``api_key`` kwarg (which
+includes ``[providers.runpod] api_key = "..."`` from prophecy.toml) →
+``RUNPOD_API_KEY`` environment variable → hard error. Either path is
+supported; environment variables are safer when the toml is committed
+or shared, the toml is convenient when it's gitignored and local only.
 
 Default model is ``Qwen/Qwen2.5-14B-Instruct`` — same family as the
 local Ollama default but the HF-style model ID that vLLM expects.
@@ -84,10 +86,12 @@ class RunPodServerlessProvider(OpenAICompatProvider):
         if env_key:
             return env_key
         raise AIProviderError(
-            "RunPod Serverless requires an API key. "
-            f"Export {self.API_KEY_ENV_VAR} (preferred — it's a secret) "
-            "or pass --api-key. As a last resort you can put api_key under "
-            "[providers.runpod] in prophecy.toml, but never commit that file."
+            "RunPod Serverless requires an API key. Provide it one of these "
+            "ways (highest precedence first): pass --api-key, set "
+            '[providers.runpod] api_key = "…" in prophecy.toml, or export '
+            f"{self.API_KEY_ENV_VAR}. The env var is safer when the toml is "
+            "committed or shared; the toml is convenient for a gitignored "
+            "local config."
         )
 
     def _connection_hint(self, exc: Exception) -> str:
