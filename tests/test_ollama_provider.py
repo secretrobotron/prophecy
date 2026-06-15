@@ -18,7 +18,7 @@ from prophecy.providers import (
 
 class TestOllamaProvider:
     def test_init_with_defaults(self):
-        with patch("prophecy.providers.ollama.OpenAI") as mock_openai:
+        with patch("prophecy.providers._openai_compat.OpenAI") as mock_openai:
             provider = OllamaProvider()
             assert provider.model == OllamaProvider.DEFAULT_MODEL
             assert provider.base_url == OllamaProvider.DEFAULT_BASE_URL
@@ -31,7 +31,7 @@ class TestOllamaProvider:
             )
 
     def test_init_with_custom_model_and_base_url(self):
-        with patch("prophecy.providers.ollama.OpenAI") as mock_openai:
+        with patch("prophecy.providers._openai_compat.OpenAI") as mock_openai:
             provider = OllamaProvider(
                 model="qwen2.5:14b-instruct",
                 base_url="http://192.168.1.50:11434/v1",
@@ -43,7 +43,7 @@ class TestOllamaProvider:
             )
 
     def test_init_with_explicit_api_key_overrides_placeholder(self):
-        with patch("prophecy.providers.ollama.OpenAI") as mock_openai:
+        with patch("prophecy.providers._openai_compat.OpenAI") as mock_openai:
             OllamaProvider(api_key="secret-via-proxy")
             mock_openai.assert_called_once_with(
                 api_key="secret-via-proxy", base_url=OllamaProvider.DEFAULT_BASE_URL
@@ -53,7 +53,7 @@ class TestOllamaProvider:
         """The Ollama call should pin response_format=json_object so the
         prompt template's 'pure and valid JSON' contract is enforced
         server-side instead of relying on the model behaving."""
-        with patch("prophecy.providers.ollama.OpenAI") as mock_openai:
+        with patch("prophecy.providers._openai_compat.OpenAI") as mock_openai:
             mock_response = Mock()
             mock_response.choices = [Mock()]
             mock_response.choices[0].message.content = '{"answer":true,"reason":"x","certainty":80}'
@@ -71,7 +71,7 @@ class TestOllamaProvider:
             assert call_kwargs["messages"][0]["role"] == "user"
 
     def test_post_prompt_with_system_message(self):
-        with patch("prophecy.providers.ollama.OpenAI") as mock_openai:
+        with patch("prophecy.providers._openai_compat.OpenAI") as mock_openai:
             mock_response = Mock()
             mock_response.choices = [Mock()]
             mock_response.choices[0].message.content = "ok"
@@ -86,7 +86,7 @@ class TestOllamaProvider:
             assert msgs[1] == {"role": "user", "content": "Test"}
 
     def test_post_prompt_empty_raises(self):
-        with patch("prophecy.providers.ollama.OpenAI"):
+        with patch("prophecy.providers._openai_compat.OpenAI"):
             provider = OllamaProvider()
             with pytest.raises(AIProviderError, match="Prompt cannot be empty"):
                 provider.post_prompt("")
@@ -95,7 +95,7 @@ class TestOllamaProvider:
         """When the daemon isn't running, surface a clear message instead
         of a raw APIConnectionError — this is the single most common
         first-run failure for local users."""
-        with patch("prophecy.providers.ollama.OpenAI") as mock_openai:
+        with patch("prophecy.providers._openai_compat.OpenAI") as mock_openai:
             mock_client = Mock()
             # APIConnectionError requires a Request kwarg in newer openai
             # versions; construct it the safe way through its protocol.
@@ -108,7 +108,7 @@ class TestOllamaProvider:
                 provider.post_prompt("Test")
 
     def test_post_prompt_not_found_hints_at_pull(self):
-        with patch("prophecy.providers.ollama.OpenAI") as mock_openai:
+        with patch("prophecy.providers._openai_compat.OpenAI") as mock_openai:
             mock_client = Mock()
             err = openai.NotFoundError(
                 message="model not found",
@@ -126,7 +126,7 @@ class TestOllamaProvider:
         """engine_id is used as part of the cache key; it must change when
         the model changes so swapping qwen 7b → 14b doesn't reuse old
         cached answers."""
-        with patch("prophecy.providers.ollama.OpenAI"):
+        with patch("prophecy.providers._openai_compat.OpenAI"):
             p7 = OllamaProvider(model="qwen2.5:7b-instruct")
             p14 = OllamaProvider(model="qwen2.5:14b-instruct")
             assert p7.engine_id == "ollama:qwen2.5:7b-instruct"
@@ -134,19 +134,19 @@ class TestOllamaProvider:
             assert p7.engine_id != p14.engine_id
 
     def test_validate_configuration(self):
-        with patch("prophecy.providers.ollama.OpenAI"):
+        with patch("prophecy.providers._openai_compat.OpenAI"):
             assert OllamaProvider().validate_configuration() is True
 
 
 class TestFactoryRegistration:
     def test_ollama_resolves_via_factory(self):
-        with patch("prophecy.providers.ollama.OpenAI"):
+        with patch("prophecy.providers._openai_compat.OpenAI"):
             for name in ("ollama", "local", "Ollama", "LOCAL"):
                 p = AIProviderFactory.create_provider(name)
                 assert isinstance(p, OllamaProvider), name
 
     def test_factory_passes_through_model_and_base_url(self):
-        with patch("prophecy.providers.ollama.OpenAI") as mock_openai:
+        with patch("prophecy.providers._openai_compat.OpenAI") as mock_openai:
             AIProviderFactory.create_provider(
                 "ollama",
                 model="qwen2.5:14b-instruct",
