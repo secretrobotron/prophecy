@@ -4,7 +4,8 @@ AI provider package for Prophecy.
 Public surface:
 - AIProvider — abstract base
 - AIProviderError — exception type
-- ChatGPTProvider, ClaudeProvider, ClaudeCLIProvider — concrete providers
+- ChatGPTProvider, ClaudeProvider, ClaudeCLIProvider, OllamaProvider —
+  concrete providers
 - AIProviderFactory — builds providers by name
 """
 
@@ -12,6 +13,7 @@ from .base import AIProvider, AIProviderError
 from .chatgpt import ChatGPTProvider
 from .claude_api import ClaudeProvider
 from .claude_cli import ClaudeCLIProvider
+from .ollama import OllamaProvider
 
 
 class AIProviderFactory:
@@ -28,6 +30,8 @@ class AIProviderFactory:
         "anthropic": ClaudeProvider,
         "claude-cli": ClaudeCLIProvider,
         "local-claude": ClaudeCLIProvider,
+        "ollama": OllamaProvider,
+        "local": OllamaProvider,
     }
 
     @classmethod
@@ -87,4 +91,5 @@ __all__ = [
     "ChatGPTProvider",
     "ClaudeProvider",
     "ClaudeCLIProvider",
+    "OllamaProvider",
 ]

@@ -197,3 +197,77 @@ class TestSettingsLoad:
         with patch.dict(os.environ, {"PROPHECY_STORIES_FILE": "from-env.yml"}, clear=True):
             s = Settings.load(config_path=toml_path, stories_file="from-kwarg.yml")
         assert s.stories_file == Path("from-kwarg.yml")
+
+
+class TestSettingsAIProvider:
+    """ai_provider + per-provider config layering."""
+
+    def test_default_ai_provider(self, tmp_path):
+        with patch.dict(os.environ, {}, clear=True):
+            s = Settings.load(config_path=tmp_path / "missing.toml")
+        assert s.ai_provider == "chatgpt"
+        assert s.providers == {}
+
+    def test_ai_provider_from_toml(self, tmp_path):
+        toml_path = tmp_path / "prophecy.toml"
+        toml_path.write_text('ai_provider = "ollama"\n')
+        with patch.dict(os.environ, {}, clear=True):
+            s = Settings.load(config_path=toml_path)
+        assert s.ai_provider == "ollama"
+
+    def test_ai_provider_env_overrides_toml(self, tmp_path):
+        toml_path = tmp_path / "prophecy.toml"
+        toml_path.write_text('ai_provider = "ollama"\n')
+        with patch.dict(os.environ, {"PROPHECY_AI_PROVIDER": "claude"}, clear=True):
+            s = Settings.load(config_path=toml_path)
+        assert s.ai_provider == "claude"
+
+    def test_providers_table_loaded(self, tmp_path):
+        toml_path = tmp_path / "prophecy.toml"
+        toml_path.write_text(
+            "ai_provider = 'ollama'\n"
+            "[providers.ollama]\n"
+            "model = 'qwen2.5:14b-instruct'\n"
+            "base_url = 'http://localhost:11434/v1'\n"
+            "[providers.chatgpt]\n"
+            "model = 'gpt-4o-mini'\n"
+        )
+        with patch.dict(os.environ, {}, clear=True):
+            s = Settings.load(config_path=toml_path)
+        assert s.ai_provider == "ollama"
+        assert s.provider_config("ollama") == {
+            "model": "qwen2.5:14b-instruct",
+            "base_url": "http://localhost:11434/v1",
+        }
+        assert s.provider_config("chatgpt") == {"model": "gpt-4o-mini"}
+        assert s.provider_config("not-configured") == {}
+
+    def test_provider_config_lookup_is_case_insensitive(self, tmp_path):
+        toml_path = tmp_path / "prophecy.toml"
+        toml_path.write_text("[providers.ollama]\nmodel = 'x'\n")
+        with patch.dict(os.environ, {}, clear=True):
+            s = Settings.load(config_path=toml_path)
+        assert s.provider_config("Ollama") == {"model": "x"}
+        assert s.provider_config("OLLAMA") == {"model": "x"}
+
+    def test_provider_config_returns_copy(self, tmp_path):
+        """Mutations on the returned dict must not poison settings.providers
+        — callers merge CLI overrides into it."""
+        toml_path = tmp_path / "prophecy.toml"
+        toml_path.write_text("[providers.ollama]\nmodel = 'a'\n")
+        with patch.dict(os.environ, {}, clear=True):
+            s = Settings.load(config_path=toml_path)
+        cfg = s.provider_config("ollama")
+        cfg["model"] = "b"
+        assert s.provider_config("ollama") == {"model": "a"}
+
+    def test_providers_env_var_is_ignored(self, tmp_path):
+        """PROPHECY_PROVIDERS as a flat string would crash dict consumers;
+        the loader skips it entirely so nothing sneaks in via env."""
+        with patch.dict(os.environ, {"PROPHECY_PROVIDERS": "garbage"}, clear=True):
+            s = Settings.load(config_path=tmp_path / "missing.toml")
+        assert s.providers == {}
+
+    def test_providers_must_be_dict(self):
+        with pytest.raises(ValueError, match="providers must be a mapping"):
+            Settings(providers="not-a-dict")  # type: ignore[arg-type]
