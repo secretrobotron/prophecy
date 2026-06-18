@@ -8,9 +8,13 @@ same structural checks to every TSV in that set and additionally verify
 that IDs are globally unique across the union.
 
 Requirements being tested:
-1. Each file must be tab-separated data with exactly four columns
-2. Headers must be 'id', 'category', 'topic', and 'prompt'
+1. Each file must be tab-separated data with four or five columns
+   (the optional fifth column is ``weight``)
+2. Headers must start with 'id', 'category', 'topic', 'prompt' and may
+   include a trailing 'weight'
 3. ID values must be unique within each file and across the full set
+4. ``id``/``category``/``topic``/``prompt`` cells must be non-empty;
+   ``weight`` may be blank (means: no explicit weight)
 """
 
 import csv
@@ -44,20 +48,31 @@ class TestPromptsFileStructure:
     def test_file_exists(self, prompts_file):
         assert prompts_file.exists(), f"{prompts_file} should exist"
 
-    def test_file_is_tab_separated_with_four_columns(self, prompts_file):
+    def test_file_is_tab_separated_with_expected_columns(self, prompts_file):
         rows = _read_rows(prompts_file)
         assert rows, f"{prompts_file} should not be empty"
+        header_cols = len(rows[0])
+        assert header_cols in (4, 5), (
+            f"{prompts_file.name} header has {header_cols} columns, expected 4 or 5. "
+            f"Row content: {rows[0]}"
+        )
         for i, row in enumerate(rows):
-            assert len(row) == 4, (
-                f"{prompts_file.name} row {i + 1} has {len(row)} columns, expected 4. "
-                f"Row content: {row}"
+            assert len(row) == header_cols, (
+                f"{prompts_file.name} row {i + 1} has {len(row)} columns, "
+                f"expected {header_cols} (to match the header). Row content: {row}"
             )
 
     def test_headers_are_correct(self, prompts_file):
         rows = _read_rows(prompts_file)
-        expected = ["id", "category", "topic", "prompt"]
-        assert rows[0] == expected, (
-            f"{prompts_file.name} headers should be {expected}, found {rows[0]}"
+        required = ["id", "category", "topic", "prompt"]
+        # Required columns first, optional 'weight' column allowed at the end.
+        assert rows[0][: len(required)] == required, (
+            f"{prompts_file.name} headers must start with {required}, found {rows[0]}"
+        )
+        extras = rows[0][len(required) :]
+        assert extras in ([], ["weight"]), (
+            f"{prompts_file.name} unexpected trailing headers: {extras} "
+            f"(only optional 'weight' is allowed)"
         )
 
     def test_id_values_unique_within_file(self, prompts_file):
@@ -73,26 +88,30 @@ class TestPromptsFileStructure:
                 seen.add(value)
             pytest.fail(f"{prompts_file.name}: duplicate ID values: {sorted(dupes)}")
 
-    def test_no_empty_cells(self, prompts_file):
+    def test_required_cells_non_empty(self, prompts_file):
+        """``weight`` may be blank but the other four columns must be filled."""
         rows = _read_rows(prompts_file)
+        required = ["id", "category", "topic", "prompt"]
         for i, row in enumerate(rows[1:], start=2):
             if not row:
                 continue
-            for col_name, cell in zip(["id", "category", "topic", "prompt"], row, strict=False):
+            for col_name, cell in zip(required, row[: len(required)], strict=False):
                 assert cell and cell.strip(), (
                     f"{prompts_file.name} row {i}, column '{col_name}' is empty"
                 )
 
     def test_tab_separation_consistency(self, prompts_file):
+        rows = _read_rows(prompts_file)
+        expected_tabs = len(rows[0]) - 1  # tab count matches the header width
         with open(prompts_file, encoding="utf-8") as f:
             for i, line in enumerate(f, start=1):
                 stripped = line.rstrip("\n")
                 if not stripped.strip():
                     continue
                 tab_count = stripped.count("\t")
-                assert tab_count == 3, (
-                    f"{prompts_file.name} line {i} has {tab_count} tabs, expected 3. "
-                    f"Line content: '{stripped[:100]}...'"
+                assert tab_count == expected_tabs, (
+                    f"{prompts_file.name} line {i} has {tab_count} tabs, "
+                    f"expected {expected_tabs}. Line content: '{stripped[:100]}...'"
                 )
 
 

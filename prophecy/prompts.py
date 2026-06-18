@@ -6,11 +6,15 @@ templates using the Template system.
 """
 
 import csv
+import logging
 import textwrap
 from pathlib import Path
 from string import Template
+from typing import Any
 
 from .settings import Settings
+
+logger = logging.getLogger(__name__)
 
 
 class Prompts:
@@ -68,8 +72,11 @@ class Prompts:
         if not self.template_path.exists():
             raise FileNotFoundError(f"Template file not found: {self.template_path}")
 
-        # Load prompts data
-        self._prompts_data: list[dict[str, str]] = []
+        # Load prompts data. Rows are TSV dicts: id/category/topic/prompt are
+        # always strings; the optional ``weight`` field is ``int`` when the
+        # TSV provides a value or ``None`` when blank/missing. Typed as
+        # ``Any`` here so the union doesn't cascade through every accessor.
+        self._prompts_data: list[dict[str, Any]] = []
         self._load_prompts()
 
         # Load template
@@ -87,8 +94,14 @@ class Prompts:
         return sorted(self.prompts_folder.glob("prompts*.tsv"))
 
     def _load_prompts(self):
-        """Load and merge prompts data from every discovered TSV, enforcing global ID uniqueness."""
-        merged: list[dict[str, str]] = []
+        """Load and merge prompts data from every discovered TSV, enforcing global ID uniqueness.
+
+        The optional ``weight`` column is parsed if present. A blank cell or
+        a missing column resolves to ``None`` (no explicit weight). Resolution
+        from ``None`` to an effective numeric weight happens in
+        :meth:`get_effective_weights`, where the per-topic policy lives.
+        """
+        merged: list[dict[str, Any]] = []
         id_origin: dict[str, Path] = {}
         for path in self.prompts_paths:
             with open(path, encoding="utf-8") as f:
@@ -102,6 +115,23 @@ class Prompts:
                         f"(already defined in {id_origin[prompt_id]})"
                     )
                 id_origin[prompt_id] = path
+                raw_weight = (row.get("weight") or "").strip()
+                if raw_weight == "":
+                    parsed_weight: int | None = None
+                else:
+                    try:
+                        parsed_weight = int(raw_weight)
+                    except ValueError as e:
+                        raise ValueError(
+                            f"Invalid weight '{raw_weight}' for prompt id "
+                            f"'{prompt_id}' in {path}: must be an integer or blank"
+                        ) from e
+                    if parsed_weight < 0:
+                        raise ValueError(
+                            f"Negative weight {parsed_weight} for prompt id "
+                            f"'{prompt_id}' in {path}: weights must be >= 0"
+                        )
+                row["weight"] = parsed_weight
                 merged.append(row)
 
         if not merged:
@@ -109,6 +139,63 @@ class Prompts:
                 f"No prompts data found in {', '.join(str(p) for p in self.prompts_paths)}"
             )
         self._prompts_data = merged
+        self._warn_partial_weight_topics()
+
+    def _warn_partial_weight_topics(self) -> None:
+        """Log one WARN block per topic that has weights on *some* but not all prompts.
+
+        Mixed topics get a weighted rate, but prompts without an explicit weight
+        contribute nothing (effective weight 0) — surface them so a missing weight
+        doesn't quietly drop the prompt from the score.
+        """
+        from collections import defaultdict
+
+        by_topic: dict[tuple[str, str], list[dict]] = defaultdict(list)
+        for p in self._prompts_data:
+            by_topic[(p.get("category", ""), p.get("topic", ""))].append(p)
+
+        for (category, topic), prompts in by_topic.items():
+            weighted = [p for p in prompts if p.get("weight") is not None]
+            unweighted = [p for p in prompts if p.get("weight") is None]
+            if not weighted or not unweighted:
+                continue  # fully weighted or fully unweighted — both are clean
+            listing = "\n".join(
+                f"    {p.get('id', '?'):>8}  {p.get('prompt', '')}" for p in unweighted
+            )
+            logger.warning(
+                f"Topic {category!r}/{topic!r} has weights but "
+                f"{len(unweighted)} of {len(prompts)} prompts are unweighted "
+                f"(will contribute weight=0 to the weighted score):\n{listing}"
+            )
+
+    def get_effective_weights(self) -> dict[str, float]:
+        """Resolve each prompt id to its effective numeric weight.
+
+        Per-topic policy:
+          * Topic has zero explicit weights → uniform ``1.0`` for every prompt
+            in that topic (fully-unweighted fallback; identical to plain
+            counting).
+          * Topic has at least one explicit weight → prompts without an
+            explicit weight resolve to ``0.0`` (they don't contribute to the
+            weighted score). :meth:`_warn_partial_weight_topics` already
+            warned about these at load time.
+        """
+        from collections import defaultdict
+
+        by_topic: dict[tuple[str, str], list[dict]] = defaultdict(list)
+        for p in self._prompts_data:
+            by_topic[(p.get("category", ""), p.get("topic", ""))].append(p)
+
+        out: dict[str, float] = {}
+        for prompts in by_topic.values():
+            any_weighted = any(p.get("weight") is not None for p in prompts)
+            for p in prompts:
+                w = p.get("weight")
+                if w is None:
+                    out[p["id"]] = 0.0 if any_weighted else 1.0
+                else:
+                    out[p["id"]] = float(w)
+        return out
 
     def get_prompts(self) -> list[dict[str, str]]:
         """

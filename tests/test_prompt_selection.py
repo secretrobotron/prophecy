@@ -529,7 +529,11 @@ class TestQueryCommand:
         assert rc == 0
         lines = capsys.readouterr().out.strip().split("\n")
         assert lines[0] == (
-            "story\tbook\tcategory\ttopic\tengine\thits\ttotal\thit_rate\tavg_certainty"
+            "story\tbook\tcategory\ttopic\tengine\thits\ttotal\tprompt_count"
+            "\thit_rate\tavg_certainty"
         )
         assert len(lines) == 2
-        assert lines[1].startswith("Sample Story\tGenesis\tPolitics\tPopulism\tunknown\t1\t1\t")
+        # Weighted columns are always two-decimal; raw prompt_count stays integer.
+        assert lines[1].startswith(
+            "Sample Story\tGenesis\tPolitics\tPopulism\tunknown\t1.00\t1.00\t1\t"
+        )

@@ -1,38 +1,38 @@
-id	category	topic	prompt
-per-1	Persian	Return to Zion	After a long captivity, the Hebrews are suddenly allowed by the king to return to their ancestral homeland
-per-2	Persian	Return to Zion	Thousands of Hebrews left captivity and walked back to their ancestral homeland, which they have never seen before
-per-3	Persian	Return to Zion	There are Hebrew returnees led by two people, a political leader and a priest
-per-4	Persian	Return to Zion	There are Hebrew returnees who believe that after leaving captivity and walking to their ancestral homeland, they will resettle it
-per-5	Persian	Return to Zion	There are Hebrew returnees who enter the Hebrew land from its east
-per-6	Persian	Return to Zion	There are Hebrew returnees from captivity, and there is peace and no wars or military conflicts
-per-7	Persian	Return to Zion	There are Hebrew returnees led by a man called Joshua
-per-8	Persian	Return to Zion	There is a Hebrew leader called Joshua who has a holy box associated with Yahweh and his magical powers
-per-9	Persian	Return to Zion	There is a Hebrew leader called Joshua who started out as the second most important person but ended up as the leader of the Hebrews
-per-10	Persian	Return to Zion	It might have seemed that Yahweh has forgotten about the Hebrews while they were in captivity, but he eventually saved them
-per-11	Persian	Return to Zion	Freeing the Hebrews from captivity in a foreign land restored the correct order of things
-per-12	Persian	Return to Zion	The Hebrews write in the past tense that Yahweh took them out (הוצאתי) of a foreign country where they were held captive
-per-13	Persian	Return to Zion	Yahweh tells the Hebrews that he was the one who eventually allowed them to leave their captivity and return home
-per-14	Persian	Return to Zion	The tells us that even though the Hebrews suffered in their captivity in a foreign land, they eventually returned home
-per-15	Persian	Persian Zoroastrian	The universe is governed by one or two divine forces, not more
-per-16	Persian	Persian Zoroastrian	The text emphasizes the difference between light and darkness
-per-17	Persian	Persian Zoroastrian	The text contrasts light and darkness
-per-18	Persian	Persian Zoroastrian	The text emphasizes that light is good
-per-19	Persian	Persian Zoroastrian	The text emphasizes that Yahweh is both the God of the elements of light and darkness
-per-20	Persian	Persian Zoroastrian	God brought order into the universe
-per-21	Persian	Persian Zoroastrian	There is a correct cosmic order
-per-22	Persian	Persian Zoroastrian	The text emphasizes the contrast between chaos and order
-per-23	Persian	Persian Zoroastrian	There is a correlation between light and order on one hand, and darkness and chaos on the other
-per-24	Persian	Persian Zoroastrian	The text emphasizes a cosmic contrast between light and darkness, symbolizing good and evil
-per-25	Persian	Persian Zoroastrian	The text depicts a struggle or conflict between order and chaos, where divine action brings stability or control over disorder
-per-26	Persian	Persian Zoroastrian	There are magicians who cast protective spells, to protect water sources, nature and domesticated animals
-per-27	Persian	Persian Zoroastrian	There is an emphasis on polluted sources of water
-per-28	Persian	Persian Zoroastrian	There is an emphasis on purity
-per-29	Persian	Persian Zoroastrian	There is an emphasis on personal moral righteousness
-per-30	Persian	Persian Zoroastrian	Yahweh is described as a God with a masterplan
-per-31	Persian	Persian Zoroastrian	Yahweh is described as perfect and he never changes his mind
-per-32	Persian	Persian Zoroastrian	The narrative includes divine foresight, judgment, or eschatological themes about ultimate triumph of good over evil
-per-33	Persian	Persian Zoroastrian	The text uses metaphors of light and darkness, or knowledge and ignorance, to contrast moral or spiritual states
-per-34	Persian	Persian Zoroastrian	The narrative highlights divine protection, guidance, or intervention that restores order after chaos or conflict
-per-35	Persian	Persian Zoroastrian	After meeting God, his prophet is bathed with light
-per-36	Persian	Persian Zoroastrian	Time is meticulously counted and divided
-per-37	Persian	Persian Zoroastrian	The number seven is important and holy
+id	category	topic	prompt	weight
+per-1	Persian	Return to Zion	After a long captivity, the Hebrews are suddenly allowed by the king to return to their ancestral homeland	
+per-2	Persian	Return to Zion	Thousands of Hebrews left captivity and walked back to their ancestral homeland, which they have never seen before	
+per-3	Persian	Return to Zion	There are Hebrew returnees led by two people, a political leader and a priest	
+per-4	Persian	Return to Zion	There are Hebrew returnees who believe that after leaving captivity and walking to their ancestral homeland, they will resettle it	
+per-5	Persian	Return to Zion	There are Hebrew returnees who enter the Hebrew land from its east	
+per-6	Persian	Return to Zion	There are Hebrew returnees from captivity, and there is peace and no wars or military conflicts	
+per-7	Persian	Return to Zion	There are Hebrew returnees led by a man called Joshua	
+per-8	Persian	Return to Zion	There is a Hebrew leader called Joshua who has a holy box associated with Yahweh and his magical powers	
+per-9	Persian	Return to Zion	There is a Hebrew leader called Joshua who started out as the second most important person but ended up as the leader of the Hebrews	
+per-10	Persian	Return to Zion	It might have seemed that Yahweh has forgotten about the Hebrews while they were in captivity, but he eventually saved them	
+per-11	Persian	Return to Zion	Freeing the Hebrews from captivity in a foreign land restored the correct order of things	
+per-12	Persian	Return to Zion	The Hebrews write in the past tense that Yahweh took them out (הוצאתי) of a foreign country where they were held captive	
+per-13	Persian	Return to Zion	Yahweh tells the Hebrews that he was the one who eventually allowed them to leave their captivity and return home	
+per-14	Persian	Return to Zion	The tells us that even though the Hebrews suffered in their captivity in a foreign land, they eventually returned home	
+per-15	Persian	Persian Zoroastrian	The universe is governed by one or two divine forces, not more	
+per-16	Persian	Persian Zoroastrian	The text emphasizes the difference between light and darkness	
+per-17	Persian	Persian Zoroastrian	The text contrasts light and darkness	
+per-18	Persian	Persian Zoroastrian	The text emphasizes that light is good	
+per-19	Persian	Persian Zoroastrian	The text emphasizes that Yahweh is both the God of the elements of light and darkness	
+per-20	Persian	Persian Zoroastrian	God brought order into the universe	
+per-21	Persian	Persian Zoroastrian	There is a correct cosmic order	
+per-22	Persian	Persian Zoroastrian	The text emphasizes the contrast between chaos and order	
+per-23	Persian	Persian Zoroastrian	There is a correlation between light and order on one hand, and darkness and chaos on the other	
+per-24	Persian	Persian Zoroastrian	The text emphasizes a cosmic contrast between light and darkness, symbolizing good and evil	
+per-25	Persian	Persian Zoroastrian	The text depicts a struggle or conflict between order and chaos, where divine action brings stability or control over disorder	
+per-26	Persian	Persian Zoroastrian	There are magicians who cast protective spells, to protect water sources, nature and domesticated animals	
+per-27	Persian	Persian Zoroastrian	There is an emphasis on polluted sources of water	
+per-28	Persian	Persian Zoroastrian	There is an emphasis on purity	
+per-29	Persian	Persian Zoroastrian	There is an emphasis on personal moral righteousness	
+per-30	Persian	Persian Zoroastrian	Yahweh is described as a God with a masterplan	
+per-31	Persian	Persian Zoroastrian	Yahweh is described as perfect and he never changes his mind	
+per-32	Persian	Persian Zoroastrian	The narrative includes divine foresight, judgment, or eschatological themes about ultimate triumph of good over evil	
+per-33	Persian	Persian Zoroastrian	The text uses metaphors of light and darkness, or knowledge and ignorance, to contrast moral or spiritual states	
+per-34	Persian	Persian Zoroastrian	The narrative highlights divine protection, guidance, or intervention that restores order after chaos or conflict	
+per-35	Persian	Persian Zoroastrian	After meeting God, his prophet is bathed with light	
+per-36	Persian	Persian Zoroastrian	Time is meticulously counted and divided	
+per-37	Persian	Persian Zoroastrian	The number seven is important and holy	

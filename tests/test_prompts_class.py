@@ -503,6 +503,131 @@ class TestPromptsIntegration:
             pytest.skip("Real data not available for validation test")
 
 
+class TestWeightColumn:
+    """Tests for the optional ``weight`` column.
+
+    Weight semantics:
+      * Missing column or blank cell → no explicit weight (``None`` on the row).
+      * Topic with zero explicit weights → uniform 1.0 for every prompt.
+      * Topic with any explicit weight → blanks resolve to 0.0 (don't
+        contribute), and a load-time warning lists the affected prompts.
+    """
+
+    @staticmethod
+    def _write(prompts_dir: Path, name: str, content: str) -> None:
+        with open(prompts_dir / name, "w", encoding="utf-8") as f:
+            f.write(content)
+        if not (prompts_dir / "template.txt").exists():
+            with open(prompts_dir / "template.txt", "w", encoding="utf-8") as f:
+                f.write("$prompt\n$text\n")
+
+    @pytest.fixture
+    def make_tsv(self, tmp_path):
+        """Factory: scaffold a data folder whose prompts.tsv has caller-supplied rows."""
+
+        def _make(rows_tsv: str, with_weight_col: bool = True) -> Path:
+            data = tmp_path / "data"
+            prompts_dir = data / "prompts"
+            prompts_dir.mkdir(parents=True)
+            header = (
+                "id\tcategory\ttopic\tprompt\tweight\n"
+                if with_weight_col
+                else "id\tcategory\ttopic\tprompt\n"
+            )
+            self._write(prompts_dir, "prompts.tsv", header + rows_tsv)
+            return data
+
+        return _make
+
+    def test_missing_weight_column_loads_as_none(self, make_tsv):
+        """Legacy 4-column TSVs (no weight column at all) load fine; weights default to None."""
+        data = make_tsv(
+            "1\tCat\tTopicA\tA prompt\n2\tCat\tTopicA\tAnother\n",
+            with_weight_col=False,
+        )
+        prompts = Prompts(str(data))
+        weights = [p.get("weight") for p in prompts.get_prompts()]
+        assert weights == [None, None]
+        # Effective weights fall back to uniform 1.0 (fully-unweighted topic).
+        eff = prompts.get_effective_weights()
+        assert eff == {"1": 1.0, "2": 1.0}
+
+    def test_explicit_weights_parse_as_ints(self, make_tsv):
+        data = make_tsv(
+            "1\tCat\tTopicA\tA prompt\t3\n2\tCat\tTopicA\tAnother\t5\n3\tCat\tTopicA\tThird\t1\n"
+        )
+        prompts = Prompts(str(data))
+        rows = {p["id"]: p for p in prompts.get_prompts()}
+        assert rows["1"]["weight"] == 3
+        assert rows["2"]["weight"] == 5
+        assert rows["3"]["weight"] == 1
+        eff = prompts.get_effective_weights()
+        assert eff == {"1": 3.0, "2": 5.0, "3": 1.0}
+
+    def test_partial_weight_topic_zeroes_blanks_and_warns(self, make_tsv, caplog):
+        """Mixing weighted + unweighted prompts in one topic: blanks → 0,
+        and the loader warns so the silent-drop is visible."""
+        data = make_tsv(
+            "1\tCat\tT\tWeighted A\t3\n"
+            "2\tCat\tT\tBlank B\t\n"
+            "3\tCat\tT\tWeighted C\t2\n"
+            "4\tCat\tT\tBlank D\t\n"
+        )
+        with caplog.at_level("WARNING", logger="prophecy.prompts"):
+            prompts = Prompts(str(data))
+        eff = prompts.get_effective_weights()
+        assert eff == {"1": 3.0, "2": 0.0, "3": 2.0, "4": 0.0}
+        # One warning per partial-weight topic; lists every zero-weighted id.
+        assert any("'Cat'/'T'" in rec.message for rec in caplog.records)
+        warn_text = "\n".join(rec.message for rec in caplog.records)
+        assert "Blank B" in warn_text and "Blank D" in warn_text
+        # Fully-weighted prompts are not listed as "missing" in the warning.
+        assert "Weighted A" not in warn_text and "Weighted C" not in warn_text
+
+    def test_fully_unweighted_topic_does_not_warn(self, make_tsv, caplog):
+        data = make_tsv("1\tCat\tT\tA\t\n2\tCat\tT\tB\t\n")
+        with caplog.at_level("WARNING", logger="prophecy.prompts"):
+            Prompts(str(data))
+        assert not any("weights but" in rec.message for rec in caplog.records)
+
+    def test_fully_weighted_topic_does_not_warn(self, make_tsv, caplog):
+        data = make_tsv("1\tCat\tT\tA\t1\n2\tCat\tT\tB\t2\n")
+        with caplog.at_level("WARNING", logger="prophecy.prompts"):
+            Prompts(str(data))
+        assert not any("weights but" in rec.message for rec in caplog.records)
+
+    def test_invalid_weight_raises(self, make_tsv):
+        data = make_tsv("1\tCat\tT\tA\tnot-a-number\n")
+        with pytest.raises(ValueError, match="Invalid weight"):
+            Prompts(str(data))
+
+    def test_negative_weight_raises(self, make_tsv):
+        data = make_tsv("1\tCat\tT\tA\t-1\n")
+        with pytest.raises(ValueError, match="Negative weight"):
+            Prompts(str(data))
+
+    def test_weight_zero_is_legal_and_means_no_contribution(self, make_tsv):
+        """``weight=0`` is explicit "ignore me" — distinct from a blank cell only in
+        that it doesn't trigger the partial-weight warning."""
+        data = make_tsv("1\tCat\tT\tA\t0\n2\tCat\tT\tB\t5\n")
+        prompts = Prompts(str(data))
+        eff = prompts.get_effective_weights()
+        assert eff == {"1": 0.0, "2": 5.0}
+
+    def test_per_topic_policy_is_independent(self, make_tsv):
+        """One topic being weighted shouldn't force another topic into weighted mode."""
+        data = make_tsv(
+            "1\tCat\tWeighted\tA\t3\n"
+            "2\tCat\tWeighted\tB\t1\n"
+            "3\tCat\tUnweighted\tC\t\n"
+            "4\tCat\tUnweighted\tD\t\n"
+        )
+        prompts = Prompts(str(data))
+        eff = prompts.get_effective_weights()
+        # "Weighted" topic uses its explicit values; "Unweighted" gets uniform 1.0.
+        assert eff == {"1": 3.0, "2": 1.0, "3": 1.0, "4": 1.0}
+
+
 if __name__ == "__main__":
     # Allow running tests directly
     pytest.main([__file__, "-v"])
