@@ -187,7 +187,8 @@ def test_export_picks_up_labels_json(data_folder):
                         "topic": "Populism",
                         "hits": 1,
                         "total": 1,
-                        "avg_certainty": 90.0,
+                        "cert_sum": 90.0,
+                        "hit_cert_sum": 90.0,
                         "prompts": [{"id": "1", "answer": True, "certainty": 90, "prompt": "test"}],
                     }
                 ],
@@ -275,6 +276,51 @@ def test_export_drops_results_for_unknown_stories(data_folder):
         assert manifest["total_results"] == 4
         # And no shard for an unknown story's book either.
         assert all(s["book"] != "unknown" for s in manifest["shards"])
+
+
+def test_export_bundles_hypotheses_when_folder_present(data_folder):
+    """When data/hypotheses/*.yml exists, the export bundles them as a JSON
+    array and adds files.hypotheses to the manifest."""
+    hyp_dir = data_folder / "hypotheses"
+    hyp_dir.mkdir()
+    (hyp_dir / "ej.yml").write_text(
+        "id: ej\n"
+        "title: E and J in Exodus\n"
+        "mode: compare\n"
+        "slice: {sources: [E, J], books: [Exodus]}\n"
+        "buckets:\n"
+        "  A: {label: Populist, topics: [Populism]}\n"
+        "  B: {label: Elitist, topics: [Elitism]}\n",
+        encoding="utf-8",
+    )
+
+    with tempfile.TemporaryDirectory() as out_tmp:
+        out_dir = Path(out_tmp) / "dist"
+        with patch.dict(os.environ, {"PROPHECY_DATA_FOLDER": str(data_folder)}, clear=False):
+            rc = export_command(["--out", str(out_dir), "--verbosity", "WARNING"])
+        assert rc == 0
+
+        bundled = out_dir / "hypotheses.json"
+        assert bundled.exists()
+        payload = json.loads(bundled.read_text())
+        assert isinstance(payload, list) and len(payload) == 1
+        assert payload[0]["id"] == "ej"
+
+        manifest = json.loads((out_dir / "index.json").read_text())
+        assert manifest["files"]["hypotheses"] == "hypotheses.json"
+
+
+def test_export_without_hypotheses_folder_omits_from_manifest(data_folder):
+    """No data/hypotheses → no hypotheses.json, no manifest entry."""
+    with tempfile.TemporaryDirectory() as out_tmp:
+        out_dir = Path(out_tmp) / "dist"
+        with patch.dict(os.environ, {"PROPHECY_DATA_FOLDER": str(data_folder)}, clear=False):
+            rc = export_command(["--out", str(out_dir), "--verbosity", "WARNING"])
+        assert rc == 0
+
+        assert not (out_dir / "hypotheses.json").exists()
+        manifest = json.loads((out_dir / "index.json").read_text())
+        assert "hypotheses" not in manifest["files"]
 
 
 def test_export_stories_file_flag_picks_alternate_yaml(data_folder):

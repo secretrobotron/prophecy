@@ -16,6 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, cast
 
+from . import scoring
 from .bible import Bible
 from .prompts import Prompts
 from .settings import Settings
@@ -1084,6 +1085,7 @@ def _format_table(rows: list[dict[str, Any]]) -> str:
         ("engine", "Engine"),
         ("hits", "Hits"),
         ("total", "Total"),
+        ("prompt_count", "N"),
         ("hit_rate", "Hit%"),
         ("avg_certainty", "AvgCert"),
     ]
@@ -1093,6 +1095,12 @@ def _format_table(rows: list[dict[str, Any]]) -> str:
             return f"{value * 100:.0f}%"
         if key == "avg_certainty":
             return f"{value:.0f}"
+        if key in ("hits", "total"):
+            # Always show one decimal so weighted (fractional) totals are
+            # legible without producing noisy "2.0"s when the topic is
+            # uniformly weighted. The 0.5 step matches the integer-weight
+            # data we ship today.
+            return f"{value:.1f}"
         return str(value)
 
     rendered = [{key: fmt(key, row[key]) for key, _ in columns} for row in rows]
@@ -1126,6 +1134,7 @@ def query_command(argv: list[str]) -> int:
 
     prompt_meta = {p["id"]: (p["category"], p["topic"]) for p in prompts.get_prompts()}
     story_book = {title: stories.get_story(title).book for title in stories.titles}
+    effective_weights = prompts.get_effective_weights()
 
     cache_folder = settings.resolve_cache_folder()
     raw_results = _load_cached_results(cache_folder, logger)
@@ -1178,16 +1187,31 @@ def query_command(argv: list[str]) -> int:
         if certainty < args.min_certainty:
             continue
 
+        # Synthetic ids (concat:*) and any prompt missing from the catalog
+        # fall back to uniform weight 1.0 — same effect as the pre-weights
+        # behavior for those rows.
+        weight = effective_weights.get(prompt_id, 1.0)
+
         key = (story_title, book, category, topic, engine)
-        bucket = agg.setdefault(key, {"hits": 0, "total": 0, "cert_sum": 0.0})
-        bucket["total"] += 1
+        bucket = agg.setdefault(
+            key,
+            {
+                "hits": 0.0,
+                "total": 0.0,
+                "cert_sum": 0.0,
+                "hit_cert_sum": 0.0,
+                "prompt_count": 0,
+            },
+        )
+        bucket["prompt_count"] += 1
+        bucket["total"] += weight
         if r.get("answer"):
-            bucket["hits"] += 1
-        bucket["cert_sum"] += certainty
+            bucket["hits"] += weight
+            bucket["hit_cert_sum"] += weight * certainty
+        bucket["cert_sum"] += weight * certainty
 
     summary = []
     for (story_title, book, category, topic, engine), bucket in agg.items():
-        total = bucket["total"]
         summary.append(
             {
                 "story": story_title,
@@ -1195,10 +1219,11 @@ def query_command(argv: list[str]) -> int:
                 "category": category,
                 "topic": topic,
                 "engine": engine,
-                "hits": int(bucket["hits"]),
-                "total": int(total),
-                "hit_rate": (bucket["hits"] / total) if total else 0.0,
-                "avg_certainty": (bucket["cert_sum"] / total) if total else 0.0,
+                "hits": bucket["hits"],
+                "total": bucket["total"],
+                "prompt_count": bucket["prompt_count"],
+                "hit_rate": scoring.hit_rate(bucket),
+                "avg_certainty": scoring.avg_certainty(bucket),
             }
         )
 
@@ -1207,11 +1232,14 @@ def query_command(argv: list[str]) -> int:
     if args.format == "json":
         print(json.dumps(summary, indent=2))
     elif args.format == "tsv":
-        print("story\tbook\tcategory\ttopic\tengine\thits\ttotal\thit_rate\tavg_certainty")
+        print(
+            "story\tbook\tcategory\ttopic\tengine\thits\ttotal\tprompt_count\thit_rate\tavg_certainty"
+        )
         for row in summary:
             print(
                 f"{row['story']}\t{row['book']}\t{row['category']}\t{row['topic']}\t{row['engine']}\t"
-                f"{row['hits']}\t{row['total']}\t{row['hit_rate']:.4f}\t{row['avg_certainty']:.2f}"
+                f"{row['hits']:.2f}\t{row['total']:.2f}\t{row['prompt_count']}\t"
+                f"{row['hit_rate']:.4f}\t{row['avg_certainty']:.2f}"
             )
     else:
         print(_format_table(summary))
@@ -1433,6 +1461,37 @@ def export_command(argv: list[str]) -> int:
     else:
         logger.info("No data/labels.json found — viewer Labels tab will be empty")
 
+    # Bundle pre-baked hypotheses (data/hypotheses/*.yml) as a single JSON
+    # array the viewer's Hypotheses tab reads on boot. Validation against the
+    # corpus facets is best-effort: warnings log, but the bundle still ships
+    # so an unresolved topic shows up as an empty bucket rather than a hard
+    # failure that blocks the whole export.
+    from .hypotheses import load_all as _load_hypotheses
+    from .hypotheses import validate_against_facets
+
+    hypotheses_src = Path(settings.data_folder) / "hypotheses"
+    hypotheses = _load_hypotheses(hypotheses_src)
+    hypotheses_included = False
+    if hypotheses:
+        source_set: set[str] = set()
+        for entry in stories_payload.values():
+            for src in entry.get("sources") or []:
+                source_set.add(src)
+        for warn in validate_against_facets(
+            hypotheses,
+            known_topics=facets_topics,
+            known_books=set(by_book.keys()),
+            known_sources=source_set,
+        ):
+            logger.warning(f"hypothesis validation: {warn}")
+        payload = [h.payload for h in hypotheses]
+        with open(out_root / "hypotheses.json", "w", encoding="utf-8") as f:
+            json.dump(payload, f, separators=(",", ":"))
+        hypotheses_included = True
+        logger.info(f"Bundled {len(hypotheses)} hypothes{'is' if len(hypotheses) == 1 else 'es'}")
+    else:
+        logger.info("No data/hypotheses/*.yml found — viewer Hypotheses tab will be empty")
+
     # Write the manifest.
     manifest_files = {
         "prompts": "prompts.json",
@@ -1441,6 +1500,8 @@ def export_command(argv: list[str]) -> int:
     }
     if labels_included:
         manifest_files["labels"] = "labels.json"
+    if hypotheses_included:
+        manifest_files["hypotheses"] = "hypotheses.json"
 
     manifest = {
         "generated_at": datetime.datetime.now(datetime.UTC)
@@ -1558,6 +1619,7 @@ def label_command(argv: list[str]) -> int:
         p["id"]: {"category": p["category"], "topic": p["topic"], "prompt": p["prompt"]}
         for p in prompts.get_prompts()
     }
+    effective_weights = prompts.get_effective_weights()
     story_book = {title: stories.get_story(title).book for title in stories.titles}
     available_books = sorted(set(story_book.values()))
 
@@ -1626,18 +1688,23 @@ def label_command(argv: list[str]) -> int:
                 "engine": engine,
                 "category": meta["category"],
                 "topic": meta["topic"],
-                "hits": 0,
-                "total": 0,
-                "cert_sum": 0,
+                "hits": 0.0,
+                "total": 0.0,
+                "cert_sum": 0.0,
+                "hit_cert_sum": 0.0,
+                "prompt_count": 0,
                 "prompts": [],
             },
         )
         answer = bool(r.get("answer", False))
         certainty = int(r.get("certainty", 0) or 0)
-        bucket["total"] += 1
+        weight = effective_weights.get(prompt_id, 1.0)
+        bucket["prompt_count"] += 1
+        bucket["total"] += weight
         if answer:
-            bucket["hits"] += 1
-        bucket["cert_sum"] += certainty
+            bucket["hits"] += weight
+            bucket["hit_cert_sum"] += weight * certainty
+        bucket["cert_sum"] += weight * certainty
         # Pull the cache id (last 8 chars are enough to navigate by — the full
         # stem stays in the cache filename) and the rationale text so the
         # viewer can show provenance + reasoning without re-reading the cache.
@@ -1647,6 +1714,7 @@ def label_command(argv: list[str]) -> int:
                 "id": prompt_id,
                 "answer": answer,
                 "certainty": certainty,
+                "weight": weight,
                 "prompt": meta["prompt"],
                 "cache_id": cache_id,
                 "reason": str(r.get("reason", "")),
@@ -1656,9 +1724,23 @@ def label_command(argv: list[str]) -> int:
     # Emit every group, including those with zero hits. The viewer hides the
     # zero-hit ("not attributed") ones by default; surfacing them here lets
     # users opt-in without re-running label.
+    #
+    # The numeric fields are sufficient statistics — raw weighted sums only:
+    #   hits         = Σ wᵢ·aᵢ      (weighted true-answer count)
+    #   total        = Σ wᵢ         (total prompt weight)
+    #   cert_sum     = Σ wᵢ·cᵢ      (weighted certainty, cᵢ ∈ 0..100)
+    #   hit_cert_sum = Σ wᵢ·aᵢ·cᵢ   (per-prompt-coupled certainty of yes answers)
+    # Every downstream metric (hit_rate, avg_certainty, the four score modes)
+    # is derived in `prophecy.scoring` and in the JS viewer's score-math.js
+    # from those four primitives — adding a new mode is just a new function
+    # on each side, not a schema change. Fully-unweighted topics resolve to
+    # uniform weight 1.0, so the numbers collapse to the same values shipped
+    # before weights existed. `prompt_count` surfaces the raw count of
+    # contributing prompts (= len(prompts)) so the viewer can still say
+    # "n=23" without inferring it from `total`, which may be fractional in
+    # weighted topics.
     label_entries = []
     for bucket in groups.values():
-        total = bucket["total"]
         # Sort prompts inside the group: true answers first, then by certainty desc.
         bucket["prompts"].sort(key=lambda p: (not p["answer"], -p["certainty"]))
         label_entries.append(
@@ -1668,10 +1750,12 @@ def label_command(argv: list[str]) -> int:
                 "engine": bucket["engine"],
                 "category": bucket["category"],
                 "topic": bucket["topic"],
-                "hits": bucket["hits"],
-                "total": total,
+                "hits": round(bucket["hits"], 4),
+                "total": round(bucket["total"], 4),
+                "cert_sum": round(bucket["cert_sum"], 4),
+                "hit_cert_sum": round(bucket["hit_cert_sum"], 4),
+                "prompt_count": bucket["prompt_count"],
                 "attributed": bucket["hits"] > 0,
-                "avg_certainty": round(bucket["cert_sum"] / total, 1) if total else 0.0,
                 "prompts": bucket["prompts"],
             }
         )

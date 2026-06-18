@@ -114,8 +114,9 @@
                 <button type="button" class="books-view-btn" data-view="heatmap" role="tab" aria-selected="false">Heatmap</button>
               </div>
               <label class="books-pick">Score
-                <select id="books-score-mode" title="Weighted: hit_rate × avg_certainty, where hit_rate and avg_certainty are prompt-weighted aggregates (Σw·answer / Σw and Σ(w·cert) / Σw).">
+                <select id="books-score-mode" title="Weighted: hit_rate × avg_certainty (product of two prompt-weighted means: Σw·a/Σw and Σw·c/Σw). Coupled: Σw·a·c/Σw/100 — each yes contributes its own certainty per prompt, so confidently-wrong noes don't inflate the score the way they can under Weighted.">
                   <option value="weighted">Weighted score</option>
+                  <option value="coupled">Coupled weighted</option>
                   <option value="hit">Hit rate</option>
                   <option value="coverage">Coverage</option>
                 </select>
@@ -361,6 +362,6 @@
     <span id="data-source" class="muted"></span>
   </footer>
 
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
