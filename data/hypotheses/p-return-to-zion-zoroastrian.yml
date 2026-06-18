@@ -1,0 +1,21 @@
+id: p-return-to-zion-zoroastrian
+title: "The Priestly source carries post-exilic Persian markers"
+thesis: >
+  If the Priestly source was composed in or after the Persian period,
+  its stories should disproportionately reflect Persian-era concerns —
+  Return-to-Zion framing and Zoroastrian-shaped theology — relative to
+  the rest of the canon.
+mode: confirm
+tags: [source-critical, Persian-era]
+slice:
+  sources: [P]
+buckets:
+  A:
+    label: "Persian-era markers"
+    topics: ["Return to Zion", "Persian Zoroastrian"]
+default_scoring: weighted
+notes: >
+  Confounder: any story with cosmic-order language ("light from
+  darkness", "set apart") may light up on Zoroastrian prompts without
+  actually carrying Persian-era content. Read the prompt-level
+  rationale on the strongest hits before drawing conclusions.

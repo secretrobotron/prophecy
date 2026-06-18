@@ -1,0 +1,24 @@
+id: ej-exodus-populist-vs-elitist
+title: "E and J in Exodus: populist or elitist?"
+thesis: >
+  The E and J strands in Exodus tell narratives that lean one way on the
+  populist/elitist axis. This view compares the two label topics
+  story-by-story across the E+J slice so the direction (and the stories
+  driving it) is visible at a glance.
+mode: compare
+tags: [Exodus, source-critical]
+slice:
+  sources: [E, J]
+  books: [Exodus]
+buckets:
+  A:
+    label: "Populist"
+    topics: ["Populism"]
+  B:
+    label: "Elitist"
+    topics: ["Elitism"]
+default_scoring: weighted
+notes: >
+  Counter-evidence to watch: the Golden Calf cycle — does the narrative
+  actually blame the people, or Aaron? Stories with both buckets near
+  zero suggest the political axis is irrelevant rather than balanced.
