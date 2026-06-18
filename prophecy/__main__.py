@@ -14,7 +14,7 @@ import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from .bible import Bible
 from .prompts import Prompts
@@ -603,7 +603,8 @@ def initialize_ai_provider(args, settings: Settings, logger: logging.Logger):
         # compute hammering the endpoint with rejected calls. Skippable
         # in case the endpoint doesn't implement /v1/models or is too
         # slow to query.
-        if not args.skip_model_check and hasattr(ai_provider, "verify_model_available"):
+        verify_model_available = getattr(ai_provider, "verify_model_available", None)
+        if not args.skip_model_check and callable(verify_model_available):
             # Bumped from DEBUG to INFO: this call can hang for 30-60s on
             # a cold serverless endpoint, and silence at default verbosity
             # made it look like prophecy itself had stalled.
@@ -612,7 +613,7 @@ def initialize_ai_provider(args, settings: Settings, logger: logging.Logger):
                 f"(may take up to a minute on a cold serverless worker)…"
             )
             try:
-                available = ai_provider.verify_model_available()
+                available = cast(list[str], verify_model_available())
             except FatalAIProviderError as e:
                 logger.error(f"{e}")
                 sys.exit(1)
