@@ -162,6 +162,9 @@ prophecy.toml
 # Generated viewer bundle (produced by `python -m prophecy export`)
 viewer/data/
 
+# Claude Code's local scratch (session settings + agent worktrees)
+.claude/
+
 # Spyder project settings
 .spyderproject
 .spyproject
