@@ -1606,7 +1606,10 @@ function renderRankingLabelAddOptions() {
 
 // Score a single (story, book, label) tuple under the current score mode.
 // Returns null if there's no labels.json row matching the filter (so the caller
-// can decide whether to treat as 0 or skip).
+// can decide whether to treat as 0 or skip). Scores are on a 0-100 scale to
+// match the threshold UI and bar widths. "weighted" mirrors storyScore() — the
+// same formula used by the Books and Hypotheses tabs — so all three tabs read
+// the same number for a given (story, label).
 function rankingScoreFor(book, story, label) {
   for (const l of state.labels) {
     if (l.book !== book || l.story !== story) continue;
@@ -1614,11 +1617,7 @@ function rankingScoreFor(book, story, label) {
     if (state.rankingEngine && l.engine !== state.rankingEngine) continue;
     if (!l.total) return 0;
     if (state.rankingScoreMode === "weighted") {
-      let sum = 0;
-      for (const p of l.prompts) {
-        if (p.answer) sum += Number(p.certainty) || 0;
-      }
-      return sum / l.total;
+      return (l.hits / l.total) * (l.avg_certainty || 0);
     }
     return (l.hits / l.total) * 100;
   }
