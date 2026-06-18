@@ -114,8 +114,8 @@
                 <button type="button" class="books-view-btn" data-view="heatmap" role="tab" aria-selected="false">Heatmap</button>
               </div>
               <label class="books-pick">Score
-                <select id="books-score-mode">
-                  <option value="weighted">Weighted (hit × cert)</option>
+                <select id="books-score-mode" title="Weighted: hit_rate × avg_certainty, where hit_rate and avg_certainty are prompt-weighted aggregates (Σw·answer / Σw and Σ(w·cert) / Σw).">
+                  <option value="weighted">Weighted score</option>
                   <option value="hit">Hit rate</option>
                   <option value="coverage">Coverage</option>
                 </select>
@@ -160,8 +160,8 @@
                 <select id="ranking-engine"><option value="">(all)</option></select>
               </label>
               <label class="ranking-pick">Score
-                <select id="ranking-score-mode">
-                  <option value="weighted">Weighted (confidence × hit)</option>
+                <select id="ranking-score-mode" title="Weighted: hit_rate × avg_certainty, where hit_rate and avg_certainty are prompt-weighted aggregates (Σw·answer / Σw and Σ(w·cert) / Σw). Same formula as the Books and Hypotheses tabs.">
+                  <option value="weighted">Weighted score</option>
                   <option value="straight">Straight (hit count)</option>
                 </select>
               </label>

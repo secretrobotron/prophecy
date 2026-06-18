@@ -2195,8 +2195,8 @@ function renderHypothesisReport() {
         <select id="hyp-engine">${engineOptions}</select>
       </label>
       <label>Score
-        <select id="hyp-score-mode">
-          <option value="weighted"${state.hypScoreMode === "weighted" ? " selected" : ""}>Weighted (hit × cert)</option>
+        <select id="hyp-score-mode" title="Weighted: hit_rate × avg_certainty, where hit_rate and avg_certainty are prompt-weighted aggregates (Σw·answer / Σw and Σ(w·cert) / Σw).">
+          <option value="weighted"${state.hypScoreMode === "weighted" ? " selected" : ""}>Weighted score</option>
           <option value="hit"${state.hypScoreMode === "hit" ? " selected" : ""}>Hit rate</option>
           <option value="coverage"${state.hypScoreMode === "coverage" ? " selected" : ""}>Coverage</option>
         </select>
