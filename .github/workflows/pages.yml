@@ -34,7 +34,12 @@ jobs:
       - name: Export cached results bundle
         # Writes dist/data/{index.json,prompts.json,stories.json,results/*.jsonl}.
         # The viewer (HTML/CSS/JS) is copied alongside so it can fetch from ./data/.
-        run: uv run python -m prophecy export --out dist/data
+        #
+        # --stories-file picks the source-tagged catalog used by the cached
+        # results. Locally this is set via prophecy.toml (gitignored — holds
+        # the runpod API key), so CI has to pass it explicitly or every result
+        # gets dropped as an orphan and the manifest reports zero.
+        run: uv run python -m prophecy export --out dist/data --stories-file stories-according-to-source.yml
 
       - name: Stage viewer files into dist/
         # Glob every .js at viewer/ root (app.js + per-tab modules) so adding
