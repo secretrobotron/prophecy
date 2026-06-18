@@ -37,7 +37,10 @@ jobs:
         run: uv run python -m prophecy export --out dist/data
 
       - name: Stage viewer files into dist/
-        run: cp viewer/index.html viewer/styles.css viewer/app.js dist/
+        # Glob every .js at viewer/ root (app.js + per-tab modules) so adding
+        # a new ES module doesn't silently 404 on Pages. Non-recursive, so
+        # viewer/test/*.js stays out of the published bundle.
+        run: cp viewer/index.html viewer/styles.css viewer/*.js dist/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
