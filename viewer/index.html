@@ -10,12 +10,40 @@
   <header>
     <h1>Prophecy Viewer</h1>
     <nav class="tabs">
-      <button class="tab-button active" data-tab="labels">Labels</button>
-      <button class="tab-button" data-tab="books">Books</button>
-      <button class="tab-button" data-tab="ranking">Ranking</button>
-      <button class="tab-button" data-tab="prompts">Prompts</button>
-      <button class="tab-button" data-tab="responses">Responses</button>
-      <button class="tab-button" data-tab="query">Query</button>
+      <button class="tab-button" data-tab="hypotheses">Hypotheses</button>
+
+      <div class="nav-menu" data-menu="analysis">
+        <button type="button" class="nav-menu-toggle" aria-expanded="false" aria-haspopup="true">
+          <span class="nav-menu-label">Analysis</span>
+          <span class="nav-menu-chevron" aria-hidden="true">&#9662;</span>
+        </button>
+        <div class="nav-menu-panel" hidden role="menu">
+          <button class="tab-button active" data-tab="labels" role="menuitem">By Label</button>
+          <button class="tab-button" data-tab="books" role="menuitem">By Book</button>
+        </div>
+      </div>
+
+      <div class="nav-menu" data-menu="explore">
+        <button type="button" class="nav-menu-toggle" aria-expanded="false" aria-haspopup="true">
+          <span class="nav-menu-label">Explore</span>
+          <span class="nav-menu-chevron" aria-hidden="true">&#9662;</span>
+        </button>
+        <div class="nav-menu-panel" hidden role="menu">
+          <button class="tab-button" data-tab="ranking" role="menuitem">Ranking</button>
+          <button class="tab-button" data-tab="query" role="menuitem">Query</button>
+        </div>
+      </div>
+
+      <div class="nav-menu" data-menu="data">
+        <button type="button" class="nav-menu-toggle" aria-expanded="false" aria-haspopup="true">
+          <span class="nav-menu-label">Data</span>
+          <span class="nav-menu-chevron" aria-hidden="true">&#9662;</span>
+        </button>
+        <div class="nav-menu-panel" hidden role="menu">
+          <button class="tab-button" data-tab="prompts" role="menuitem">Prompts</button>
+          <button class="tab-button" data-tab="responses" role="menuitem">Responses</button>
+        </div>
+      </div>
     </nav>
     <div id="manifest-summary" class="muted"></div>
   </header>
@@ -170,6 +198,17 @@
       </div>
     </section>
 
+    <section id="tab-hypotheses" class="tab-panel">
+      <div class="hyp-layout">
+        <aside class="hyp-sidebar" aria-label="Hypotheses">
+          <ul id="hyp-list" class="hyp-list"></ul>
+        </aside>
+        <div class="hyp-pane">
+          <div id="hyp-report"></div>
+        </div>
+      </div>
+    </section>
+
     <section id="tab-prompts" class="tab-panel">
       <div class="filters">
         <label>Category
@@ -185,7 +224,7 @@
       </div>
       <table id="prompts-table">
         <thead>
-          <tr><th>ID</th><th>Category</th><th>Topic</th><th>Prompt</th><th>Results</th></tr>
+          <tr><th>ID</th><th>Category</th><th>Topic</th><th>Prompt</th><th title="Explicit weight from prompts.tsv (blank = no weight set; topic is uniform-weighted)">Weight</th><th>Results</th></tr>
         </thead>
         <tbody></tbody>
       </table>
@@ -231,6 +270,7 @@
             <th>Engine</th>
             <th>Answer</th>
             <th>Cert</th>
+            <th title="Explicit weight from prompts.tsv (— = no weight set; topic is uniform-weighted)">Weight</th>
             <th>Reason</th>
           </tr>
         </thead>
@@ -304,8 +344,9 @@
             <th>Category</th>
             <th>Topic</th>
             <th>Engine</th>
-            <th>Hits</th>
-            <th>Total</th>
+            <th title="Σ w·answer (weighted hit sum)">Hits</th>
+            <th title="Σ w (weighted denominator)">Total</th>
+            <th title="Number of prompts that contributed">N</th>
             <th>Hit %</th>
             <th>Avg cert</th>
           </tr>

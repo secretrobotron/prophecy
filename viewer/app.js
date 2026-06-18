@@ -14,6 +14,7 @@ const DATA_ROOT = (params.get("data") || "data").replace(/\/$/, "");
 const state = {
   manifest: null,
   prompts: [],
+  promptWeights: {},     // id -> effective numeric weight (mirrors Prompts.get_effective_weights)
   stories: {},
   labels: [],            // flat list from data/labels.json (empty if not bundled)
   shardCache: new Map(), // book -> rows[]
@@ -42,7 +43,47 @@ const state = {
   rankingScoreMode: "weighted",     // "weighted" | "straight"
   rankingCombineMode: "position",   // "position" | "equal"
   rankingThreshold: 0,              // 0..100
+
+  // Hypotheses tab UI state
+  hypotheses: [],                   // bundled pre-baked hypotheses (raw payloads)
+  hypothesisSelected: null,         // id of the currently-rendered hypothesis
+  hypEngine: "",                    // engine filter ("" = mean across engines)
+  hypScoreMode: "weighted",         // weighted | hit | coverage (matches storyScore())
+  hypMinCert: 0,                    // 0..100 — filter weak prompt contributions
+  hypCounterFirst: false,           // sort scorecard so counter-evidence comes first
 };
+
+// Render a weighted numeric value (Σwa or Σw). Drop the decimal when the value
+// is integer-equivalent (uniform-weight topics, where w=1 collapses Σw to N).
+function formatWeighted(value) {
+  if (value == null) return "";
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+// Mirror of prophecy.prompts.Prompts.get_effective_weights() in JS so client-side
+// aggregations (Query tab, anywhere we recompute from raw shards) use the same
+// per-topic policy as the server-side label/query commands:
+//   * topic with zero explicit weights → uniform 1.0 (fully-unweighted fallback)
+//   * topic with any explicit weights → blanks → 0.0 (don't contribute)
+function computeEffectiveWeights(prompts) {
+  const byTopic = new Map();
+  for (const p of prompts) {
+    const key = `${p.category}\t${p.topic}`;
+    if (!byTopic.has(key)) byTopic.set(key, []);
+    byTopic.get(key).push(p);
+  }
+  const out = {};
+  for (const group of byTopic.values()) {
+    const anyWeighted = group.some(
+      (p) => p.weight !== null && p.weight !== undefined && p.weight !== "",
+    );
+    for (const p of group) {
+      const hasWeight = p.weight !== null && p.weight !== undefined && p.weight !== "";
+      out[p.id] = hasWeight ? Number(p.weight) : anyWeighted ? 0.0 : 1.0;
+    }
+  }
+  return out;
+}
 
 // ---------- Bootstrap ----------
 
@@ -55,6 +96,7 @@ async function bootstrap() {
     ]);
     state.manifest = manifest;
     state.prompts = prompts;
+    state.promptWeights = computeEffectiveWeights(prompts);
     state.stories = stories;
 
     // Labels are optional — only present if `prophecy label` was run before
@@ -67,6 +109,19 @@ async function bootstrap() {
       } catch (err) {
         console.warn(`Failed to load labels file ${labelsFile}:`, err);
         state.labels = [];
+      }
+    }
+
+    // Hypotheses are optional too — pre-baked analytical frames bundled by
+    // `prophecy export` when data/hypotheses/*.yml exists. The tab shows an
+    // empty state when the file is absent.
+    const hypothesesFile = manifest.files && manifest.files.hypotheses;
+    if (hypothesesFile) {
+      try {
+        state.hypotheses = await fetchJson(`${DATA_ROOT}/${hypothesesFile}`);
+      } catch (err) {
+        console.warn(`Failed to load hypotheses file ${hypothesesFile}:`, err);
+        state.hypotheses = [];
       }
     }
 
@@ -83,6 +138,7 @@ async function bootstrap() {
     renderLabelsTab();
     renderBooksTab();
     renderRankingTab();
+    renderHypothesesTab();
     bindEvents();
 
     // Honour the URL hash on first paint: deep-links like ?…#books open
@@ -91,6 +147,16 @@ async function bootstrap() {
     const initial = window.location.hash.replace(/^#/, "");
     if (validTabName(initial)) {
       switchTab(initial, { fromHash: true });
+    } else {
+      // No deep-link: switchTab never ran, so the parent nav-menu highlight
+      // hasn't been computed yet. Sync it from whichever tab-button the
+      // markup already has marked active.
+      const active = document.querySelector(".tab-button.active");
+      if (active) {
+        for (const menu of document.querySelectorAll(".nav-menu")) {
+          menu.classList.toggle("active", menu.contains(active));
+        }
+      }
     }
     // Back/forward navigation through tab history.
     window.addEventListener("hashchange", () => {
@@ -256,7 +322,29 @@ function fillSelect(id, options) {
 
 function bindEvents() {
   for (const btn of document.querySelectorAll(".tab-button")) {
-    btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+    btn.addEventListener("click", () => {
+      switchTab(btn.dataset.tab);
+      closeAllNavMenus();
+    });
+  }
+
+  // Top-bar grouping dropdowns (Analysis / Explore / Data). Only one open at
+  // a time; clicks inside the panel itself don't bubble up to the document
+  // close handler.
+  for (const menu of document.querySelectorAll(".nav-menu")) {
+    const toggle = menu.querySelector(".nav-menu-toggle");
+    const panel = menu.querySelector(".nav-menu-panel");
+    toggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const willOpen = panel.hasAttribute("hidden");
+      closeAllNavMenus();
+      closeAllDropdowns();
+      if (willOpen) {
+        panel.removeAttribute("hidden");
+        toggle.setAttribute("aria-expanded", "true");
+      }
+    });
+    panel.addEventListener("click", (e) => e.stopPropagation());
   }
 
   document.getElementById("prompts-category").addEventListener("change", renderPrompts);
@@ -407,11 +495,17 @@ function bindEvents() {
     panel.addEventListener("click", (e) => e.stopPropagation());
   }
 
-  // Click anywhere else: close any open dropdown.
-  document.addEventListener("click", closeAllDropdowns);
-  // Escape: close any open dropdown.
+  // Click anywhere else: close any open dropdown / nav menu.
+  document.addEventListener("click", () => {
+    closeAllDropdowns();
+    closeAllNavMenus();
+  });
+  // Escape: close any open dropdown / nav menu.
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeAllDropdowns();
+    if (e.key === "Escape") {
+      closeAllDropdowns();
+      closeAllNavMenus();
+    }
   });
 }
 
@@ -426,12 +520,31 @@ function closeAllDropdowns() {
   }
 }
 
+function closeAllNavMenus() {
+  for (const menu of document.querySelectorAll(".nav-menu")) {
+    const panel = menu.querySelector(".nav-menu-panel");
+    const toggle = menu.querySelector(".nav-menu-toggle");
+    if (!panel.hasAttribute("hidden")) {
+      panel.setAttribute("hidden", "");
+      toggle.setAttribute("aria-expanded", "false");
+    }
+  }
+}
+
 function switchTab(name, opts = {}) {
   for (const btn of document.querySelectorAll(".tab-button")) {
     btn.classList.toggle("active", btn.dataset.tab === name);
   }
   for (const panel of document.querySelectorAll(".tab-panel")) {
     panel.classList.toggle("active", panel.id === `tab-${name}`);
+  }
+  // A nav-menu group lights up when one of its children is the active tab,
+  // so the top bar shows which group the current view lives under.
+  for (const menu of document.querySelectorAll(".nav-menu")) {
+    menu.classList.toggle(
+      "active",
+      Boolean(menu.querySelector(`.tab-button[data-tab="${name}"]`)),
+    );
   }
   if (name === "responses") renderResponses();
   // Sync the URL hash so each tab change pushes a history entry — back
@@ -669,10 +782,13 @@ function renderBookGrid(bookLabels, title, body) {
         ...labels.map((l) => {
           const isAttributed = l.attributed !== undefined ? l.attributed : l.hits > 0;
           const cls = isAttributed ? "label-chip" : "label-chip label-chip-unattributed";
+          const hitsStr = formatWeighted(l.hits);
+          const totalStr = formatWeighted(l.total);
+          const nStr = l.prompt_count != null ? ` of ${l.prompt_count}` : "";
           return `<span class="${cls}" data-category="${escapeHtml(l.category)}"
-                   title="${escapeHtml(l.topic)}:${escapeHtml(l.category)} — ${l.hits}/${l.total} (avg ${l.avg_certainty})">
+                   title="${escapeHtml(l.topic)}:${escapeHtml(l.category)} — ${hitsStr}/${totalStr}${nStr} (avg ${l.avg_certainty})">
               ${escapeHtml(l.topic)}
-              <span class="label-chip-score">${l.hits}/${l.total}</span>
+              <span class="label-chip-score">${hitsStr}/${totalStr}</span>
             </span>`;
         }),
       ].join("");
@@ -802,7 +918,7 @@ function renderLabelCard(l, storyLabels) {
           ${engineNote}
         </h3>
         <div class="label-card-score">
-          <div>${l.hits} / ${l.total} · avg cert ${l.avg_certainty}</div>
+          <div>${formatWeighted(l.hits)} / ${formatWeighted(l.total)}${l.prompt_count != null ? ` <span class="muted">(n=${l.prompt_count})</span>` : ""} · avg cert ${l.avg_certainty}</div>
           <div class="label-card-bar"><div class="label-card-bar-fill" style="width:${pct.toFixed(1)}%"></div></div>
         </div>
       </div>
@@ -833,6 +949,7 @@ function renderPromptRow(p) {
         <span class="prompt-id">#${escapeHtml(p.id)}</span>
         ${cacheTag}
         <span class="prompt-text">${escapeHtml(p.prompt)}</span>
+        ${p.weight != null && p.weight !== 1 ? `<span class="prompt-weight" title="weight ${p.weight}">w${formatWeighted(p.weight)}</span>` : ""}
         <span class="prompt-cert">${p.certainty}</span>
       </summary>
       ${reasonBlock}
@@ -1651,12 +1768,21 @@ function renderPrompts() {
       const count = counts[p.id] || 0;
       const cellClass = count > 0 ? "bool-true mono" : "muted mono";
       const label = count > 0 ? String(count) : "—";
+      // Explicit weight only — blank cell stays a dash so users can tell
+      // "no weight set" apart from "weight set to 1" (only the second
+      // signals an authored decision; the first inherits the uniform
+      // fallback that kicks in when nobody in the topic is weighted).
+      const hasWeight = p.weight !== null && p.weight !== undefined && p.weight !== "";
+      const weightCell = hasWeight
+        ? `<span class="mono">${p.weight}</span>`
+        : `<span class="muted">—</span>`;
       return `
       <tr>
         <td class="mono">${escapeHtml(p.id)}</td>
         <td>${escapeHtml(p.category)}</td>
         <td>${escapeHtml(p.topic)}</td>
         <td>${escapeHtml(p.prompt)}</td>
+        <td>${weightCell}</td>
         <td class="${cellClass}">${label}</td>
       </tr>`;
     })
@@ -1719,11 +1845,23 @@ async function renderResponses() {
     if (matched.length > cap * 2) break;
   }
 
+  // Build an explicit-weight lookup from the loaded prompts catalog. Blank
+  // / missing means "no weight authored" — render as an em-dash so it reads
+  // distinctly from an explicit weight of 1.
+  const explicitWeight = {};
+  for (const p of state.prompts) {
+    const has = p.weight !== null && p.weight !== undefined && p.weight !== "";
+    explicitWeight[p.id] = has ? p.weight : null;
+  }
+
   const tbody = document.querySelector("#responses-table tbody");
   tbody.innerHTML = matched
     .slice(0, cap)
-    .map(
-      (r) => `
+    .map((r) => {
+      const w = explicitWeight[r.prompt];
+      const weightCell =
+        w == null ? `<span class="muted">—</span>` : `<span class="mono">${w}</span>`;
+      return `
       <tr>
         <td>${escapeHtml(r.story)}</td>
         <td>${escapeHtml(r.book)}</td>
@@ -1733,9 +1871,10 @@ async function renderResponses() {
         <td class="mono">${escapeHtml(r.engine)}</td>
         <td class="${r.answer ? "bool-true" : "bool-false"}">${r.answer ? "true" : "false"}</td>
         <td>${r.certainty}</td>
+        <td>${weightCell}</td>
         <td class="reason">${escapeHtml(r.reason || "")}</td>
-      </tr>`,
-    )
+      </tr>`;
+    })
     .join("");
 
   const more = matched.length > cap ? ` (showing first ${cap})` : "";
@@ -1789,13 +1928,18 @@ async function runQuery() {
           engine: r.engine,
           hits: 0,
           total: 0,
+          promptCount: 0,
           certSum: 0,
         };
         agg.set(key, bucket);
       }
-      bucket.total += 1;
-      if (r.answer) bucket.hits += 1;
-      bucket.certSum += r.certainty || 0;
+      // Synthetic ids (concat:*) and prompts dropped from the catalog fall
+      // back to weight 1.0 — same policy as the python aggregator.
+      const w = state.promptWeights[r.prompt] ?? 1.0;
+      bucket.promptCount += 1;
+      bucket.total += w;
+      if (r.answer) bucket.hits += w;
+      bucket.certSum += w * (r.certainty || 0);
     }
   }
 
@@ -1823,8 +1967,9 @@ async function runQuery() {
         <td>${escapeHtml(r.category)}</td>
         <td>${escapeHtml(r.topic)}</td>
         <td class="mono">${escapeHtml(r.engine)}</td>
-        <td>${r.hits}</td>
-        <td>${r.total}</td>
+        <td>${formatWeighted(r.hits)}</td>
+        <td>${formatWeighted(r.total)}</td>
+        <td>${r.promptCount}</td>
         <td>${Math.round(r.hitRate * 100)}%</td>
         <td>${r.avgCertainty.toFixed(0)}</td>
       </tr>`,
@@ -1833,6 +1978,677 @@ async function runQuery() {
 
   document.getElementById("query-summary").textContent =
     `${rows.length} group(s) across ${books.length} book shard(s).`;
+}
+
+// ---------- Hypotheses tab ----------
+//
+// Pre-baked hypothesis frames bundled by `prophecy export` from
+// data/hypotheses/*.yml. Each hypothesis names a slice (by source tag and/or
+// book), one or two label "buckets" (single bucket = confirmatory,
+// A vs B = comparative), and a thesis statement. The viewer reads the
+// bundle and presents a gallery: pick a hypothesis on the left, see its
+// verdict, per-engine spread, per-story evidence, heatmap, exemplars,
+// counter-evidence, and notes on the right.
+//
+// All scoring reuses `storyScore(row, mode)` from the Books tab so the
+// Hypotheses verdicts can't drift from what users see elsewhere.
+
+function renderHypothesesTab() {
+  if (!state.hypotheses.length) {
+    document.getElementById("hyp-list").innerHTML = "";
+    document.getElementById("hyp-report").innerHTML =
+      `<div class="hyp-empty">
+        No hypotheses bundled. Author <code>data/hypotheses/*.yml</code> files and re-run
+        <code>python -m prophecy export</code>.
+      </div>`;
+    return;
+  }
+  // Default selection: first hypothesis. Sticky across re-renders so changing
+  // a knob doesn't yank the user back to the top of the list.
+  if (
+    !state.hypothesisSelected ||
+    !state.hypotheses.some((h) => h.id === state.hypothesisSelected)
+  ) {
+    state.hypothesisSelected = state.hypotheses[0].id;
+    // Inherit the author's default scoring on first open of a hypothesis.
+    const defScoring = state.hypotheses[0].default_scoring;
+    if (defScoring) state.hypScoreMode = defScoring;
+  }
+  renderHypothesesList();
+  renderHypothesisReport();
+}
+
+function renderHypothesesList() {
+  const root = document.getElementById("hyp-list");
+  root.innerHTML = state.hypotheses
+    .map((h) => {
+      const active = h.id === state.hypothesisSelected ? " active" : "";
+      const slice = h.slice || {};
+      const sliceBits = [];
+      if (slice.sources && slice.sources.length) sliceBits.push(slice.sources.join("+"));
+      if (slice.books && slice.books.length) sliceBits.push(slice.books.join("/"));
+      const sliceText = sliceBits.length ? sliceBits.join(" · ") : "all";
+      return `<li class="hyp-list-item${active}" data-id="${escapeHtml(h.id)}">
+          <div class="hyp-list-title">${escapeHtml(h.title)}</div>
+          <div class="hyp-list-meta">
+            <span class="hyp-mode-chip">${escapeHtml(h.mode)}</span>
+            <span>${escapeHtml(sliceText)}</span>
+          </div>
+        </li>`;
+    })
+    .join("");
+  for (const node of root.querySelectorAll(".hyp-list-item")) {
+    node.addEventListener("click", () => {
+      if (state.hypothesisSelected === node.dataset.id) return;
+      state.hypothesisSelected = node.dataset.id;
+      const hyp = state.hypotheses.find((h) => h.id === node.dataset.id);
+      if (hyp && hyp.default_scoring) state.hypScoreMode = hyp.default_scoring;
+      renderHypothesesList();
+      renderHypothesisReport();
+    });
+  }
+}
+
+// Stories matching the hypothesis's slice — the universe of evidence the
+// rest of the report operates over. Only stories with at least one label row
+// are eligible, because anything else would just render as a hole.
+function hypSliceStories(hyp) {
+  const slice = hyp.slice || {};
+  const wantSources = new Set(slice.sources || []);
+  const wantBooks = new Set(slice.books || []);
+  const universe = new Map();
+  for (const l of state.labels) {
+    if (!universe.has(l.story)) universe.set(l.story, l.book);
+  }
+  const out = [];
+  for (const [story, book] of universe) {
+    if (wantBooks.size && !wantBooks.has(book)) continue;
+    if (wantSources.size) {
+      const meta = state.stories[story] || {};
+      const srcs = meta.sources || [];
+      if (!srcs.some((s) => wantSources.has(s))) continue;
+    }
+    out.push({ book, story });
+  }
+  // Canonical narrative order so reading down the report follows the text.
+  const ordered = sortStoriesCanonical(out.map((p) => p.story));
+  const byStory = new Map(out.map((p) => [p.story, p]));
+  return ordered.map((s) => byStory.get(s));
+}
+
+// Score a single (book, story, bucket) tuple under the current scoring mode,
+// optionally restricted to one engine. Returns 0..1, mean of per-topic
+// storyScore values across all matching label rows (treats absence as 0).
+function hypBucketScore(book, story, bucket, engine, scoreMode) {
+  const topics = new Set(bucket.topics || []);
+  const minCert = state.hypMinCert / 100;
+  let sum = 0;
+  let count = 0;
+  for (const l of state.labels) {
+    if (l.book !== book || l.story !== story) continue;
+    if (engine && l.engine !== engine) continue;
+    if (!topics.has(l.topic)) continue;
+    const score = storyScore(l, scoreMode);
+    if (score < minCert) continue;
+    sum += score;
+    count += 1;
+  }
+  return count > 0 ? sum / count : 0;
+}
+
+// Strongest supporting (story, prompt) pair for one bucket under the slice.
+// We pick the story with the highest bucket score, then surface its single
+// true prompt with the highest certainty. Returns null if nothing scored > 0.
+function hypTopExemplar(slice, bucket, engine, scoreMode) {
+  let best = { score: -1, story: null, book: null, prompt: null };
+  const topics = new Set(bucket.topics || []);
+  for (const { book, story } of slice) {
+    const score = hypBucketScore(book, story, bucket, engine, scoreMode);
+    if (score <= best.score) continue;
+    let bestPrompt = null;
+    let bestCert = -1;
+    for (const l of state.labels) {
+      if (l.book !== book || l.story !== story) continue;
+      if (engine && l.engine !== engine) continue;
+      if (!topics.has(l.topic)) continue;
+      for (const p of l.prompts) {
+        if (!p.answer) continue;
+        const cert = Number(p.certainty) || 0;
+        if (cert > bestCert) {
+          bestCert = cert;
+          bestPrompt = p;
+        }
+      }
+    }
+    best = { score, story, book, prompt: bestPrompt };
+  }
+  return best.score > 0 ? best : null;
+}
+
+function renderHypothesisReport() {
+  const body = document.getElementById("hyp-report");
+  const hyp = state.hypotheses.find((h) => h.id === state.hypothesisSelected);
+  if (!hyp) {
+    body.innerHTML = `<div class="hyp-empty">No hypothesis selected.</div>`;
+    return;
+  }
+
+  const slice = hypSliceStories(hyp);
+  const isCompare = hyp.mode === "compare";
+
+  const sliceBits = [];
+  const sl = hyp.slice || {};
+  if (sl.sources && sl.sources.length) sliceBits.push(`sources: ${sl.sources.join(", ")}`);
+  if (sl.books && sl.books.length) sliceBits.push(`books: ${sl.books.join(", ")}`);
+  sliceBits.push(`${slice.length} stor${slice.length === 1 ? "y" : "ies"}`);
+
+  const engines = sortedUnique(state.labels.map((l) => l.engine));
+  const engineOptions = [
+    `<option value="">(all engines, mean)</option>`,
+    ...engines.map(
+      (e) =>
+        `<option value="${escapeHtml(e)}"${e === state.hypEngine ? " selected" : ""}>${escapeHtml(e)}</option>`,
+    ),
+  ].join("");
+
+  const tagsHtml = (hyp.tags || [])
+    .map((t) => `<span class="hyp-slice-chip">${escapeHtml(t)}</span>`)
+    .join("");
+
+  // Empty-slice case: render the header but skip computation so the user
+  // sees *why* there's nothing to score (no stories matched).
+  if (!slice.length) {
+    body.innerHTML = `
+      <section class="hyp-header">
+        <h2>${escapeHtml(hyp.title)}</h2>
+        <div class="hyp-header-meta">
+          <span class="hyp-mode-chip">${escapeHtml(hyp.mode)}</span>
+          ${tagsHtml}
+          ${sliceBits.map((b) => `<span>${escapeHtml(b)}</span>`).join(" · ")}
+        </div>
+        <p class="hyp-thesis">${escapeHtml(hyp.thesis || "")}</p>
+      </section>
+      <div class="hyp-empty">No stories in the labelled corpus match this slice.</div>`;
+    return;
+  }
+
+  const verdictHtml = isCompare
+    ? renderHypVerdictCompare(hyp, slice)
+    : renderHypVerdictConfirm(hyp, slice);
+  const enginesHtml = renderHypEnginesStrip(hyp, slice, engines);
+  const scorecardHtml = renderHypScorecard(hyp, slice);
+  const heatmapHtml = renderHypHeatmap(hyp, slice);
+  const exemplarsHtml = renderHypExemplars(hyp, slice);
+
+  body.innerHTML = `
+    <section class="hyp-header">
+      <h2>${escapeHtml(hyp.title)}</h2>
+      <div class="hyp-header-meta">
+        <span class="hyp-mode-chip">${escapeHtml(hyp.mode)}</span>
+        ${tagsHtml}
+        ${sliceBits.map((b) => `<span>${escapeHtml(b)}</span>`).join(" · ")}
+      </div>
+      <p class="hyp-thesis">${escapeHtml(hyp.thesis || "")}</p>
+    </section>
+
+    <div class="hyp-toolbar" id="hyp-toolbar">
+      <label>Engine
+        <select id="hyp-engine">${engineOptions}</select>
+      </label>
+      <label>Score
+        <select id="hyp-score-mode">
+          <option value="weighted"${state.hypScoreMode === "weighted" ? " selected" : ""}>Weighted (hit × cert)</option>
+          <option value="hit"${state.hypScoreMode === "hit" ? " selected" : ""}>Hit rate</option>
+          <option value="coverage"${state.hypScoreMode === "coverage" ? " selected" : ""}>Coverage</option>
+        </select>
+      </label>
+      <label>Min score
+        <input type="number" id="hyp-min-cert" min="0" max="100" step="5" value="${state.hypMinCert}" />
+      </label>
+      <label>
+        <input type="checkbox" id="hyp-counter-first"${state.hypCounterFirst ? " checked" : ""} />
+        Counter-evidence first
+      </label>
+    </div>
+
+    <section class="hyp-section">
+      <h3>Verdict</h3>
+      ${verdictHtml}
+    </section>
+
+    <section class="hyp-section">
+      <h3>By engine</h3>
+      <div class="hyp-section-sub">One row per engine in the labels file — watch for verdicts that flip between models.</div>
+      ${enginesHtml}
+    </section>
+
+    <section class="hyp-section">
+      <h3>By story</h3>
+      <div class="hyp-section-sub">Click a row to open the underlying labels in the Labels tab.</div>
+      ${scorecardHtml}
+    </section>
+
+    <section class="hyp-section">
+      <h3>Heatmap</h3>
+      ${heatmapHtml}
+    </section>
+
+    <section class="hyp-section">
+      <h3>Exemplars</h3>
+      ${exemplarsHtml}
+    </section>
+
+    ${
+      hyp.notes
+        ? `<section class="hyp-section">
+            <h3>Notes</h3>
+            <div class="hyp-notes">${escapeHtml(hyp.notes)}</div>
+          </section>`
+        : ""
+    }
+  `;
+
+  // Toolbar handlers — re-render the whole report so every section stays in
+  // sync. Cheap because slice + scoring are pure functions over state.labels.
+  document.getElementById("hyp-engine").addEventListener("change", (e) => {
+    state.hypEngine = e.target.value;
+    renderHypothesisReport();
+  });
+  document.getElementById("hyp-score-mode").addEventListener("change", (e) => {
+    state.hypScoreMode = e.target.value;
+    renderHypothesisReport();
+  });
+  document.getElementById("hyp-min-cert").addEventListener("input", (e) => {
+    state.hypMinCert = Number(e.target.value) || 0;
+    renderHypothesisReport();
+  });
+  document.getElementById("hyp-counter-first").addEventListener("change", (e) => {
+    state.hypCounterFirst = e.target.checked;
+    renderHypothesisReport();
+  });
+
+  // Scorecard rows → drill into Labels for that story.
+  for (const node of body.querySelectorAll(".hyp-scorecard-row")) {
+    node.addEventListener("click", () => {
+      drillToLabelsStory(node.dataset.book, node.dataset.story);
+    });
+  }
+  // Exemplar story names → same drill, but narrowed to the bucket's topics
+  // so the user lands on the prompts that drove the exemplar score.
+  for (const node of body.querySelectorAll(".hyp-exemplar-story")) {
+    node.addEventListener("click", () => {
+      const book = node.dataset.book;
+      const story = node.dataset.story;
+      const topicsCsv = node.dataset.topics;
+      const topics = topicsCsv ? topicsCsv.split("|") : [];
+      drillToLabelsStoryNarrowedTopics(book, story, topics);
+    });
+  }
+  // Heatmap cell clicks: same drill as the Books heatmap.
+  for (const node of body.querySelectorAll(".hyp-heat-cell")) {
+    node.addEventListener("click", () => {
+      drillToLabelsCell(
+        node.dataset.book,
+        node.dataset.story,
+        node.dataset.category,
+        node.dataset.topic,
+      );
+    });
+  }
+}
+
+function renderHypVerdictCompare(hyp, slice) {
+  const a = hyp.buckets.A;
+  const b = hyp.buckets.B;
+  const aMean = meanOver(slice, (s) =>
+    hypBucketScore(s.book, s.story, a, state.hypEngine, state.hypScoreMode),
+  );
+  const bMean = meanOver(slice, (s) =>
+    hypBucketScore(s.book, s.story, b, state.hypEngine, state.hypScoreMode),
+  );
+  const aPct = Math.round(aMean * 100);
+  const bPct = Math.round(bMean * 100);
+  const delta = aMean - bMean;
+  const leader = delta > 0.02 ? a.label : delta < -0.02 ? b.label : null;
+  const summary = leader
+    ? `<strong>${escapeHtml(leader)}</strong> leads by ${Math.round(Math.abs(delta) * 100)}% across ${slice.length} stor${slice.length === 1 ? "y" : "ies"}.`
+    : `<strong>No clear lead</strong> — both buckets within 2% across ${slice.length} stor${slice.length === 1 ? "y" : "ies"}.`;
+  return `
+    <div class="hyp-verdict">
+      <div class="hyp-verdict-bars">
+        <div class="hyp-verdict-bucket">${escapeHtml(a.label)}</div>
+        <div class="hyp-verdict-track">
+          <div class="hyp-verdict-fill bucket-a" style="width:${aPct}%"></div>
+        </div>
+        <div class="hyp-verdict-pct">${aPct}%</div>
+
+        <div class="hyp-verdict-bucket">${escapeHtml(b.label)}</div>
+        <div class="hyp-verdict-track">
+          <div class="hyp-verdict-fill bucket-b" style="width:${bPct}%"></div>
+        </div>
+        <div class="hyp-verdict-pct">${bPct}%</div>
+      </div>
+      <div class="hyp-verdict-summary">${summary}</div>
+    </div>`;
+}
+
+function renderHypVerdictConfirm(hyp, slice) {
+  const a = hyp.buckets.A;
+  const aMean = meanOver(slice, (s) =>
+    hypBucketScore(s.book, s.story, a, state.hypEngine, state.hypScoreMode),
+  );
+  const aPct = Math.round(aMean * 100);
+  // Baseline: same buckets, but over every labelled story regardless of
+  // slice. Lets the user see "is this slice elevated vs. the whole canon?"
+  const baseline = meanOver(allLabeledStories(), (s) =>
+    hypBucketScore(s.book, s.story, a, state.hypEngine, state.hypScoreMode),
+  );
+  const basePct = Math.round(baseline * 100);
+  const delta = aPct - basePct;
+  const sign = delta >= 0 ? "+" : "";
+  const summary = `<strong>${escapeHtml(a.label)}</strong> averages ${aPct}% across the slice
+    <span class="muted">(canon baseline: ${basePct}%, <span class="mono">${sign}${delta}pp</span>)</span>.`;
+  return `
+    <div class="hyp-verdict">
+      <div class="hyp-verdict-bars">
+        <div class="hyp-verdict-bucket">${escapeHtml(a.label)}</div>
+        <div class="hyp-verdict-track">
+          <div class="hyp-verdict-fill bucket-a" style="width:${aPct}%"></div>
+        </div>
+        <div class="hyp-verdict-pct">${aPct}%</div>
+
+        <div class="hyp-verdict-bucket muted">canon</div>
+        <div class="hyp-verdict-track">
+          <div class="hyp-verdict-fill" style="width:${basePct}%;background:var(--muted)"></div>
+        </div>
+        <div class="hyp-verdict-pct muted">${basePct}%</div>
+      </div>
+      <div class="hyp-verdict-summary">${summary}</div>
+    </div>`;
+}
+
+function renderHypEnginesStrip(hyp, slice, engines) {
+  if (!engines.length) return `<div class="muted">No engines in labels.</div>`;
+  const isCompare = hyp.mode === "compare";
+  const rows = engines
+    .map((eng) => {
+      const a = meanOver(slice, (s) =>
+        hypBucketScore(s.book, s.story, hyp.buckets.A, eng, state.hypScoreMode),
+      );
+      if (isCompare) {
+        const b = meanOver(slice, (s) =>
+          hypBucketScore(s.book, s.story, hyp.buckets.B, eng, state.hypScoreMode),
+        );
+        const aPct = Math.round(a * 100);
+        const bPct = Math.round(b * 100);
+        // Render two half-bars meeting in the middle. Bucket-A pushes left
+        // from center, Bucket-B pushes right — visual rhythm matches the
+        // verdict's compare framing.
+        return `<div class="hyp-engine-row">
+          <span class="hyp-engine-name" title="${escapeHtml(eng)}">${escapeHtml(eng)}</span>
+          <div class="hyp-engine-track diverge">
+            <div class="hyp-engine-fill-a" style="right:50%;width:${aPct / 2}%"></div>
+            <div class="hyp-engine-fill-b" style="left:50%;width:${bPct / 2}%"></div>
+          </div>
+          <span class="hyp-engine-pct">${aPct} / ${bPct}</span>
+        </div>`;
+      }
+      const aPct = Math.round(a * 100);
+      return `<div class="hyp-engine-row">
+        <span class="hyp-engine-name" title="${escapeHtml(eng)}">${escapeHtml(eng)}</span>
+        <div class="hyp-engine-track">
+          <div class="hyp-engine-fill-a" style="left:0;width:${aPct}%"></div>
+        </div>
+        <span class="hyp-engine-pct">${aPct}%</span>
+      </div>`;
+    })
+    .join("");
+  return `<div class="hyp-engines">${rows}</div>`;
+}
+
+function renderHypScorecard(hyp, slice) {
+  const isCompare = hyp.mode === "compare";
+  const items = slice.map(({ book, story }) => {
+    const a = hypBucketScore(book, story, hyp.buckets.A, state.hypEngine, state.hypScoreMode);
+    const b = isCompare
+      ? hypBucketScore(book, story, hyp.buckets.B, state.hypEngine, state.hypScoreMode)
+      : 0;
+    return { book, story, a, b, delta: a - b };
+  });
+  // Counter-evidence: compare = B wins; confirm = A is weak.
+  const isCounter = isCompare
+    ? (r) => r.b > r.a + 0.02
+    : (r) => r.a < 0.15;
+  if (state.hypCounterFirst) {
+    items.sort((x, y) => {
+      const xc = isCounter(x) ? 0 : 1;
+      const yc = isCounter(y) ? 0 : 1;
+      if (xc !== yc) return xc - yc;
+      return x.story.localeCompare(y.story);
+    });
+  }
+  const rows = items
+    .map((r) => {
+      const aPct = Math.round(r.a * 100);
+      const bPct = Math.round(r.b * 100);
+      const counterCls = isCounter(r) ? " is-counter" : "";
+      if (isCompare) {
+        return `<div class="hyp-scorecard-row${counterCls}" data-book="${escapeHtml(r.book)}" data-story="${escapeHtml(r.story)}">
+          <span class="hyp-scorecard-story" title="${escapeHtml(r.story)}">${escapeHtml(r.story)}</span>
+          <div class="hyp-scorecard-track diverge">
+            <div class="hyp-scorecard-fill-a" style="right:50%;width:${aPct / 2}%"></div>
+            <div class="hyp-scorecard-fill-b" style="left:50%;width:${bPct / 2}%"></div>
+          </div>
+          <span class="hyp-scorecard-pct">${aPct} / ${bPct}</span>
+        </div>`;
+      }
+      return `<div class="hyp-scorecard-row${counterCls}" data-book="${escapeHtml(r.book)}" data-story="${escapeHtml(r.story)}">
+        <span class="hyp-scorecard-story" title="${escapeHtml(r.story)}">${escapeHtml(r.story)}</span>
+        <div class="hyp-scorecard-track">
+          <div class="hyp-scorecard-fill-a" style="left:0;width:${aPct}%"></div>
+        </div>
+        <span class="hyp-scorecard-pct">${aPct}%</span>
+      </div>`;
+    })
+    .join("");
+  return `<div class="hyp-scorecard">${rows}</div>`;
+}
+
+function renderHypHeatmap(hyp, slice) {
+  // Columns: every (category, topic) pair across both buckets. Group
+  // headers by bucket so the user can read "left half of the row =
+  // bucket A; right half = bucket B". Reuse the Books heatmap classes so
+  // the cell palette is consistent across the viewer.
+  const bucketEntries = Object.entries(hyp.buckets || {});
+  // For each topic find its category from the labels file (a topic always
+  // belongs to one category in the prompts.tsv — first match wins).
+  const topicCategory = new Map();
+  for (const l of state.labels) {
+    if (!topicCategory.has(l.topic)) topicCategory.set(l.topic, l.category);
+  }
+  // Build the column list, preserving bucket order.
+  const cols = [];
+  for (const [bucketKey, bucket] of bucketEntries) {
+    for (const topic of bucket.topics || []) {
+      cols.push({
+        bucketKey,
+        bucketLabel: bucket.label,
+        topic,
+        category: topicCategory.get(topic) || "",
+      });
+    }
+  }
+  if (!cols.length || !slice.length) {
+    return `<div class="muted">Nothing to plot.</div>`;
+  }
+
+  // Cell value: storyScore for the (story, topic) cell, restricted to engine.
+  // Same intensity bucketing as the Books heatmap.
+  const cellByKey = new Map();
+  for (const l of state.labels) {
+    if (state.hypEngine && l.engine !== state.hypEngine) continue;
+    const key = `${l.story}\t${l.topic}`;
+    const score = storyScore(l, state.hypScoreMode);
+    const prev = cellByKey.get(key) || 0;
+    cellByKey.set(key, Math.max(prev, score));
+  }
+
+  // Group header rows: bucket spans, then per-topic columns. Render two
+  // header rows so the bucket grouping is visually unmissable.
+  const bucketSpans = bucketEntries.map(([, b]) => (b.topics || []).length);
+  const groupHeaderCells = bucketEntries
+    .map(
+      ([key, b], i) =>
+        `<th class="books-heat-colhead" colspan="${bucketSpans[i]}" style="text-align:center">
+          <div class="books-heat-coltag bucket-${escapeHtml(key)}">${escapeHtml(b.label)}</div>
+        </th>`,
+    )
+    .join("");
+  const topicHeaderCells = cols
+    .map(
+      (c) => `<th class="books-heat-colhead" data-category="${escapeHtml(c.category)}" data-topic="${escapeHtml(c.topic)}">
+        <div class="books-heat-coltag" data-category="${escapeHtml(c.category)}">${escapeHtml(c.category)}</div>
+        <div class="books-heat-coltopic">${escapeHtml(c.topic)}</div>
+      </th>`,
+    )
+    .join("");
+
+  const bodyRows = slice
+    .map(({ book, story }) => {
+      const cells = cols
+        .map((c) => {
+          const score = cellByKey.get(`${story}\t${c.topic}`) || 0;
+          const pct = Math.round(score * 100);
+          let intensity = "i0";
+          if (pct >= 75) intensity = "i4";
+          else if (pct >= 50) intensity = "i3";
+          else if (pct >= 25) intensity = "i2";
+          else if (pct > 0) intensity = "i1";
+          const title = pct > 0
+            ? `${escapeHtml(story)} — ${escapeHtml(c.topic)}: ${pct}% (click to open the underlying prompts)`
+            : `${escapeHtml(story)} — no hit on ${escapeHtml(c.topic)}`;
+          return `<td class="books-heat-cell hyp-heat-cell ${intensity}"
+            data-book="${escapeHtml(book)}"
+            data-story="${escapeHtml(story)}"
+            data-category="${escapeHtml(c.category)}"
+            data-topic="${escapeHtml(c.topic)}"
+            title="${title}"></td>`;
+        })
+        .join("");
+      return `<tr><th class="books-heat-rowhead">${escapeHtml(story)}</th>${cells}</tr>`;
+    })
+    .join("");
+
+  return `<div class="hyp-heat-wrap"><table class="books-heat">
+    <thead>
+      <tr><th></th>${groupHeaderCells}</tr>
+      <tr><th></th>${topicHeaderCells}</tr>
+    </thead>
+    <tbody>${bodyRows}</tbody>
+  </table></div>`;
+}
+
+function renderHypExemplars(hyp, slice) {
+  const isCompare = hyp.mode === "compare";
+  const cards = [];
+  for (const [, bucket] of Object.entries(hyp.buckets)) {
+    const ex = hypTopExemplar(slice, bucket, state.hypEngine, state.hypScoreMode);
+    const heading = `Top "${bucket.label}"`;
+    if (!ex) {
+      cards.push(`<div class="hyp-exemplar-card">
+        <h4>${escapeHtml(heading)}</h4>
+        <div class="muted">No story scored above zero.</div>
+      </div>`);
+      continue;
+    }
+    const topicsAttr = (bucket.topics || []).join("|");
+    const promptText = ex.prompt
+      ? `<div class="hyp-exemplar-prompt">"${escapeHtml(ex.prompt.prompt)}"</div>`
+      : "";
+    const promptMeta = ex.prompt
+      ? `#${escapeHtml(ex.prompt.id)} · cert ${ex.prompt.certainty}`
+      : "—";
+    cards.push(`<div class="hyp-exemplar-card">
+      <h4>${escapeHtml(heading)}</h4>
+      <div class="hyp-exemplar-story"
+           data-book="${escapeHtml(ex.book)}"
+           data-story="${escapeHtml(ex.story)}"
+           data-topics="${escapeHtml(topicsAttr)}">${escapeHtml(ex.story)}</div>
+      ${promptText}
+      <div class="hyp-exemplar-score">score ${(ex.score * 100).toFixed(0)}% · ${promptMeta}</div>
+    </div>`);
+  }
+  // Counter-evidence card — only meaningful in compare mode (the single
+  // weakest A story is symmetric with the strongest B story already shown,
+  // so the extra card would be redundant noise in confirm).
+  if (isCompare) {
+    const items = slice
+      .map(({ book, story }) => {
+        const a = hypBucketScore(book, story, hyp.buckets.A, state.hypEngine, state.hypScoreMode);
+        const b = hypBucketScore(book, story, hyp.buckets.B, state.hypEngine, state.hypScoreMode);
+        return { book, story, a, b, delta: a - b };
+      })
+      .filter((r) => r.b > r.a + 0.02)
+      .sort((x, y) => y.b - y.a - (x.b - x.a));
+    if (items.length) {
+      const top = items[0];
+      cards.push(`<div class="hyp-exemplar-card">
+        <h4>Strongest counter-evidence</h4>
+        <div class="hyp-exemplar-story"
+             data-book="${escapeHtml(top.book)}"
+             data-story="${escapeHtml(top.story)}"
+             data-topics="">${escapeHtml(top.story)}</div>
+        <div class="hyp-exemplar-prompt">${escapeHtml(hyp.buckets.B.label)} outscores ${escapeHtml(hyp.buckets.A.label)} here.</div>
+        <div class="hyp-exemplar-score">A ${(top.a * 100).toFixed(0)}% vs B ${(top.b * 100).toFixed(0)}%</div>
+      </div>`);
+    }
+  }
+  return `<div class="hyp-exemplars">${cards.join("")}</div>`;
+}
+
+function meanOver(items, fn) {
+  if (!items.length) return 0;
+  let sum = 0;
+  for (const it of items) sum += fn(it);
+  return sum / items.length;
+}
+
+function allLabeledStories() {
+  const seen = new Map();
+  for (const l of state.labels) {
+    if (!seen.has(l.story)) seen.set(l.story, { book: l.book, story: l.story });
+  }
+  return Array.from(seen.values());
+}
+
+// Same shape as drillToLabelsStory but narrows the topic multi-select to the
+// bucket's topic set so the user lands on the prompts behind the exemplar
+// score (instead of every label the story carries).
+function drillToLabelsStoryNarrowedTopics(book, story, topics) {
+  state.labelsBookSelected = book;
+  state.labelsStorySelected = story;
+  state.labelsBookExpanded.add(book);
+  if (state.hypEngine) {
+    state.labelsEngine = state.hypEngine;
+    document.getElementById("labels-engine").value = state.hypEngine;
+  }
+  if (topics && topics.length) {
+    // Tick exactly the requested topics; untick all categories so the topic
+    // narrow isn't double-masked by a category filter.
+    setAllChecked("labels-category", true);
+    for (const el of document.querySelectorAll(
+      `#labels-topic input[type="checkbox"]`,
+    )) {
+      el.checked = topics.includes(el.value);
+    }
+    updateDropdownSummary("labels-topic");
+  } else {
+    setAllChecked("labels-category", true);
+    setAllChecked("labels-topic", true);
+  }
+  switchTab("labels");
+  renderLabelsTree();
+  renderLabelsPaneBody();
 }
 
 // ---------- Utilities ----------
